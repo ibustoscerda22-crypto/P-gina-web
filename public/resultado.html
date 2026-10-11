@@ -1,0 +1,41 @@
+<!doctype html>
+<html lang="es-CL">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Estado de tu compra · Tienda Andes</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/styles.css">
+</head>
+<body>
+  <header class="header"><a href="/" class="logo">Tienda<span>Andes</span></a></header>
+  <main class="page">
+    <div class="icon" id="icon">⏳</div>
+    <h1 id="title">Procesando tu pago…</h1>
+    <p id="message"></p>
+    <a href="/" class="btn">Volver a la tienda</a>
+  </main>
+  <script>
+    // MercadoPago agrega a la URL de retorno: status / collection_status, payment_id y external_reference.
+    const params = new URLSearchParams(location.search);
+    const status = params.get("status") || params.get("collection_status");
+    const order = params.get("external_reference");
+
+    const views = {
+      approved: ["✅", "¡Gracias por tu compra!", "Tu pago fue aprobado. Te enviaremos un correo con el detalle y el seguimiento del despacho."],
+      pending: ["⏳", "Pago pendiente", "Tu pago está en proceso. Te avisaremos por correo cuando se confirme."],
+      in_process: ["⏳", "Pago en revisión", "MercadoPago está revisando tu pago. Te avisaremos por correo."],
+      rejected: ["❌", "El pago no se pudo completar", "Puedes intentar nuevamente con otro medio de pago. Tu carrito sigue guardado."],
+      null: ["ℹ️", "Volviste sin pagar", "Tu carrito sigue guardado para cuando quieras terminar tu compra."],
+    };
+    const [icon, title, message] = views[status] || views.null;
+    document.getElementById("icon").textContent = icon;
+    document.getElementById("title").textContent = title;
+    document.getElementById("message").textContent = message + (order ? ` N° de pedido: ${order.slice(0, 8).toUpperCase()}` : "");
+
+    if (status === "approved") {
+      try { localStorage.removeItem("cart"); } catch {}
+    }
+  </script>
+</body>
+</html>

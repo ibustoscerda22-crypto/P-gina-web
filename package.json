@@ -1,0 +1,28 @@
+{
+  "name": "tienda-andes",
+  "version": "1.0.0",
+  "description": "Tienda de ropa online para Chile con pagos MercadoPago",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node --watch server.js"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/ibustoscerda22-crypto/P-gina-web.git"
+  },
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/ibustoscerda22-crypto/P-gina-web/issues"
+  },
+  "homepage": "https://github.com/ibustoscerda22-crypto/P-gina-web#readme",
+  "dependencies": {
+    "dotenv": "^18.0.7",
+    "express": "^5.3.0",
+    "mercadopago": "^3.6.1"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "private": true
+}

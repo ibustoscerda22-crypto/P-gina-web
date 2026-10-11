@@ -1,0 +1,91 @@
+<!doctype html>
+<html lang="es-CL">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Tienda Andes · Ropa hecha en Chile</title>
+  <meta name="description" content="Tienda online de ropa en Chile. Despacho a todo el país y pago seguro con MercadoPago.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/styles.css">
+</head>
+<body>
+  <div class="topbar">Envío gratis sobre <strong id="free-from">$50.000</strong> · Despacho a todo Chile 🇨🇱</div>
+
+  <header class="header">
+    <a href="/" class="logo">Tienda<span>Andes</span></a>
+    <nav class="nav" id="filters">
+      <button class="active" data-cat="todo">Todo</button>
+      <button data-cat="mujer">Mujer</button>
+      <button data-cat="hombre">Hombre</button>
+      <button data-cat="unisex">Unisex</button>
+      <button data-cat="accesorios">Accesorios</button>
+    </nav>
+    <button class="cart-btn" id="open-cart" aria-label="Abrir carrito">
+      <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 6h15l-1.5 9h-12z"/><path d="M6 6 5 3H2"/><circle cx="9" cy="20" r="1.5"/><circle cx="18" cy="20" r="1.5"/></svg>
+      <span id="cart-count">0</span>
+    </button>
+  </header>
+
+  <section class="hero">
+    <div>
+      <h1>Nueva colección<br>Primavera–Verano</h1>
+      <p>Prendas cómodas y duraderas, diseñadas en Santiago. Paga con débito, crédito o en cuotas a través de MercadoPago.</p>
+      <a href="#catalogo" class="btn">Ver colección</a>
+    </div>
+  </section>
+
+  <main id="catalogo" class="container">
+    <div class="grid" id="products"></div>
+  </main>
+
+  <section class="perks container">
+    <div><strong>🚚 Despacho nacional</strong><p>De Arica a Punta Arenas en 2 a 5 días hábiles.</p></div>
+    <div><strong>💳 Pago seguro</strong><p>Débito, crédito y cuotas con MercadoPago.</p></div>
+    <div><strong>🔄 Cambios gratis</strong><p>Tienes 30 días para cambiar tu talla.</p></div>
+  </section>
+
+  <footer class="footer">
+    <p>© <span id="year"></span> Tienda Andes SpA · RUT 77.777.777-7 · Santiago, Chile</p>
+    <p><a href="/terminos.html">Términos y condiciones</a> · <a href="mailto:contacto@tiendaandes.cl">contacto@tiendaandes.cl</a></p>
+  </footer>
+
+  <!-- Detalle de producto -->
+  <dialog id="product-modal" class="modal">
+    <form method="dialog" class="modal-close"><button aria-label="Cerrar">×</button></form>
+    <div class="modal-body" id="product-detail"></div>
+  </dialog>
+
+  <!-- Carrito -->
+  <aside class="drawer" id="cart" aria-hidden="true">
+    <div class="drawer-head">
+      <h2>Tu carrito</h2>
+      <button id="close-cart" aria-label="Cerrar">×</button>
+    </div>
+    <div id="cart-items" class="cart-items"></div>
+    <div class="cart-summary" id="cart-summary"></div>
+
+    <form id="checkout-form" class="checkout-form" hidden>
+      <h3>Datos de despacho</h3>
+      <input name="name" placeholder="Nombre y apellido" required autocomplete="name">
+      <input name="email" type="email" placeholder="Correo electrónico" required autocomplete="email">
+      <input name="phone" type="tel" placeholder="Teléfono (+56 9 ...)" autocomplete="tel">
+      <input name="address" placeholder="Dirección (calle, número, depto)" required autocomplete="street-address">
+      <input name="commune" placeholder="Comuna" required>
+      <select name="region" required>
+        <option value="">Región</option>
+        <option>Arica y Parinacota</option><option>Tarapacá</option><option>Antofagasta</option>
+        <option>Atacama</option><option>Coquimbo</option><option>Valparaíso</option>
+        <option>Metropolitana de Santiago</option><option>Libertador Gral. Bernardo O'Higgins</option>
+        <option>Maule</option><option>Ñuble</option><option>Biobío</option><option>La Araucanía</option>
+        <option>Los Ríos</option><option>Los Lagos</option><option>Aysén</option><option>Magallanes</option>
+      </select>
+      <button type="submit" class="btn btn-mp" id="pay-btn">Pagar con MercadoPago</button>
+      <p class="form-error" id="form-error"></p>
+    </form>
+  </aside>
+  <div class="overlay" id="overlay"></div>
+
+  <script src="/app.js"></script>
+</body>
+</html>
