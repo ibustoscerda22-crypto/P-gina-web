@@ -1,39 +1,41 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <!--
-    Add-in de RobotStudio que construye la celda a partir de salida/<celda>/estacion.txt.
+    Add-in de RobotStudio para la celda de paletizado.
+    - Sirve la página web (carpeta web/ del repositorio, incrustada en la DLL) en http://localhost:8765
+    - Recibe la celda desde la página, actualiza la geometría, carga el RAPID en el controlador
+      virtual e inicia la simulación.
+
     RobotStudioDir debe apuntar a la carpeta de instalación de RobotStudio 2025
-    (la que contiene Bin\ABB.Robotics.RobotStudio.dll). Ajusta la ruta si tu instalación es otra:
-      dotnet build -c Release -p:RobotStudioDir="D:\ABB\RobotStudio 2025"
+    (la que contiene Bin\ABB.Robotics.RobotStudio.dll):
+      dotnet build -c Release -p:RobotStudioDir="C:\Program Files (x86)\ABB\RobotStudio 2025"
+
+    Se compila para .NET 8 y .NET Framework 4.8; usa la carpeta que corresponda a tu RobotStudio
+    (ver README, "Instalar el Add-in").
   -->
   <PropertyGroup>
-    <TargetFramework>net8.0-windows</TargetFramework>
+    <TargetFrameworks>net8.0-windows;net48</TargetFrameworks>
     <UseWindowsForms>true</UseWindowsForms>
     <OutputType>Library</OutputType>
     <AssemblyName>PaletizadoAddin</AssemblyName>
     <RootNamespace>PaletizadoAddin</RootNamespace>
+    <LangVersion>latest</LangVersion>
     <Nullable>disable</Nullable>
     <PlatformTarget>x64</PlatformTarget>
     <RobotStudioDir Condition="'$(RobotStudioDir)' == ''">C:\Program Files (x86)\ABB\RobotStudio 2025</RobotStudioDir>
+    <RsBin>$(RobotStudioDir)\Bin</RsBin>
   </PropertyGroup>
-  <ItemGroup>
-    <Reference Include="ABB.Robotics.Math">
-      <HintPath>$(RobotStudioDir)\Bin\ABB.Robotics.Math.dll</HintPath>
-      <Private>false</Private>
-    </Reference>
-    <Reference Include="ABB.Robotics.RobotStudio">
-      <HintPath>$(RobotStudioDir)\Bin\ABB.Robotics.RobotStudio.dll</HintPath>
-      <Private>false</Private>
-    </Reference>
-    <Reference Include="ABB.Robotics.RobotStudio.Environment">
-      <HintPath>$(RobotStudioDir)\Bin\ABB.Robotics.RobotStudio.Environment.dll</HintPath>
-      <Private>false</Private>
-    </Reference>
-    <Reference Include="ABB.Robotics.RobotStudio.Stations">
-      <HintPath>$(RobotStudioDir)\Bin\ABB.Robotics.RobotStudio.Stations.dll</HintPath>
-      <Private>false</Private>
-    </Reference>
+  <ItemGroup Condition="'$(TargetFramework)' == 'net48'">
+    <PackageReference Include="Microsoft.NETFramework.ReferenceAssemblies" Version="1.0.3" PrivateAssets="all" />
   </ItemGroup>
   <ItemGroup>
+    <Reference Include="ABB.Robotics.Math"><HintPath>$(RsBin)\ABB.Robotics.Math.dll</HintPath><Private>false</Private></Reference>
+    <Reference Include="ABB.Robotics.RobotStudio"><HintPath>$(RsBin)\ABB.Robotics.RobotStudio.dll</HintPath><Private>false</Private></Reference>
+    <Reference Include="ABB.Robotics.RobotStudio.Environment"><HintPath>$(RsBin)\ABB.Robotics.RobotStudio.Environment.dll</HintPath><Private>false</Private></Reference>
+    <Reference Include="ABB.Robotics.RobotStudio.Stations"><HintPath>$(RsBin)\ABB.Robotics.RobotStudio.Stations.dll</HintPath><Private>false</Private></Reference>
+    <Reference Include="ABB.Robotics.Controllers.PC"><HintPath>$(RsBin)\ABB.Robotics.Controllers.PC.dll</HintPath><Private>false</Private></Reference>
+  </ItemGroup>
+  <ItemGroup>
+    <EmbeddedResource Include="..\..\web\*.html;..\..\web\*.js" LogicalName="web/%(Filename)%(Extension)" />
     <None Update="PaletizadoAddin.rsaddin" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 </Project>

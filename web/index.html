@@ -1,0 +1,315 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Paletizado RobotStudio</title>
+<style>
+  :root {
+    --bg:#f4f5f7; --panel:#ffffff; --texto:#1c1f24; --suave:#5d6470; --borde:#d9dce1;
+    --acento:#1f5fbf; --acento-texto:#ffffff; --ok:#1d7a3e; --aviso:#9a5b00; --error:#b3261e; --campo:#ffffff;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg:#15171a; --panel:#1f2226; --texto:#e8eaed; --suave:#a0a6b0; --borde:#34383e;
+      --acento:#6ea0f0; --acento-texto:#0d1420; --ok:#5cc983; --aviso:#e8a84a; --error:#f08a80; --campo:#17191c;
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg:#15171a; --panel:#1f2226; --texto:#e8eaed; --suave:#a0a6b0; --borde:#34383e;
+    --acento:#6ea0f0; --acento-texto:#0d1420; --ok:#5cc983; --aviso:#e8a84a; --error:#f08a80; --campo:#17191c;
+  }
+  * { box-sizing:border-box; }
+  body { margin:0; background:var(--bg); color:var(--texto); font:14px/1.45 system-ui, -apple-system, "Segoe UI", sans-serif; }
+  header { display:flex; align-items:center; gap:12px; flex-wrap:wrap; padding:14px 16px; border-bottom:1px solid var(--borde); background:var(--panel); }
+  header h1 { font-size:17px; margin:0; flex:1; }
+  .pill { font-size:12.5px; padding:4px 10px; border-radius:99px; border:1px solid var(--borde); color:var(--suave); white-space:nowrap; }
+  .pill.ok { color:var(--ok); border-color:currentColor; }
+  main { display:grid; grid-template-columns:minmax(320px, 420px) 1fr; gap:16px; padding:16px; max-width:1500px; margin:0 auto; }
+  @media (max-width:900px) { main { grid-template-columns:1fr; } }
+  .card { background:var(--panel); border:1px solid var(--borde); border-radius:10px; padding:14px; }
+  .col { display:flex; flex-direction:column; gap:16px; min-width:0; }
+  h2 { font-size:14px; margin:0 0 10px; }
+  textarea { width:100%; min-height:96px; resize:vertical; font:inherit; color:var(--texto); background:var(--campo); border:1px solid var(--borde); border-radius:8px; padding:8px 10px; }
+  .encontrado { font-size:12.5px; color:var(--suave); margin-top:6px; min-height:1.2em; }
+  fieldset { border:0; padding:0; margin:0 0 12px; }
+  legend { font-size:12px; font-weight:600; text-transform:uppercase; letter-spacing:.04em; color:var(--suave); margin-bottom:6px; }
+  .grid { display:grid; grid-template-columns:repeat(auto-fill, minmax(110px, 1fr)); gap:8px; }
+  label { display:flex; flex-direction:column; gap:3px; font-size:12.5px; color:var(--suave); }
+  input, select { font:inherit; color:var(--texto); background:var(--campo); border:1px solid var(--borde); border-radius:6px; padding:6px 8px; min-width:0; width:100%; }
+  input:focus, select:focus, textarea:focus { outline:2px solid var(--acento); outline-offset:-1px; }
+  label.check { flex-direction:row; align-items:center; gap:6px; }
+  label.check input { width:auto; }
+  details summary { cursor:pointer; font-size:12.5px; color:var(--suave); margin-bottom:8px; }
+  button { font:inherit; border-radius:8px; padding:8px 14px; cursor:pointer; border:1px solid var(--borde); background:var(--panel); color:var(--texto); }
+  button.primario { background:var(--acento); color:var(--acento-texto); border-color:var(--acento); font-weight:600; }
+  button:disabled { opacity:.5; cursor:not-allowed; }
+  .acciones { display:flex; gap:8px; flex-wrap:wrap; }
+  #vista { height:min(62vh, 620px); min-height:320px; border-radius:8px; overflow:hidden; border:1px solid var(--borde); }
+  .fila { display:flex; gap:10px; align-items:center; margin-top:10px; }
+  .fila input[type=range] { flex:1; accent-color:var(--acento); padding:0; border:0; }
+  #estadoAnim { font-variant-numeric:tabular-nums; color:var(--suave); font-size:12.5px; white-space:nowrap; }
+  .kpis { display:grid; grid-template-columns:repeat(auto-fill, minmax(140px, 1fr)); gap:10px; margin-bottom:10px; }
+  .kpi { border:1px solid var(--borde); border-radius:8px; padding:8px 10px; }
+  .kpi b { display:block; font-size:20px; font-variant-numeric:tabular-nums; }
+  .kpi span { font-size:12px; color:var(--suave); }
+  ul.avisos { margin:0; padding-left:18px; color:var(--aviso); font-size:13px; }
+  ul.avisos li + li { margin-top:4px; }
+  #log { font:12.5px/1.5 ui-monospace, Consolas, monospace; white-space:pre-wrap; background:var(--campo); border:1px solid var(--borde); border-radius:8px; padding:8px 10px; max-height:220px; overflow:auto; margin:10px 0 0; color:var(--suave); }
+  #log:empty { display:none; }
+  .error { color:var(--error); }
+  .nota { font-size:12.5px; color:var(--suave); margin:8px 0 0; }
+</style>
+<script type="importmap">
+{ "imports": {
+  "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
+  "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"
+} }
+</script>
+</head>
+<body>
+<header>
+  <h1>Paletizado ABB → RobotStudio</h1>
+  <span id="conexion" class="pill">Buscando RobotStudio…</span>
+</header>
+<main>
+  <div class="col">
+    <section class="card">
+      <h2>1. Describe la celda</h2>
+      <textarea id="texto" placeholder="Ej.: Robot IRB 460, conveyor de 2000×600 mm a 800 mm de altura, cajas de 400×300×250 mm, pallet europeo, 8 capas, mosaico alternado"></textarea>
+      <div class="acciones" style="margin-top:8px"><button id="interpretar">Interpretar texto</button></div>
+      <div id="encontrado" class="encontrado"></div>
+    </section>
+
+    <section class="card">
+      <h2>2. Revisa los datos (mm)</h2>
+      <form id="form" autocomplete="off">
+        <fieldset><legend>Robot</legend><div class="grid">
+          <label style="grid-column:span 2">Modelo<select name="robot.modelo"></select></label>
+          <label>Pedestal<input type="number" name="robot.base_z_mm" min="0" step="50"></label>
+        </div></fieldset>
+        <fieldset><legend>Conveyor</legend><div class="grid">
+          <label>Largo<input type="number" name="conveyor.largo_mm" min="100"></label>
+          <label>Ancho<input type="number" name="conveyor.ancho_mm" min="100"></label>
+          <label>Altura<input type="number" name="conveyor.altura_mm" min="0"></label>
+        </div></fieldset>
+        <fieldset><legend>Caja</legend><div class="grid">
+          <label>Largo<input type="number" name="caja.largo_mm" min="10"></label>
+          <label>Ancho<input type="number" name="caja.ancho_mm" min="10"></label>
+          <label>Alto<input type="number" name="caja.alto_mm" min="10"></label>
+          <label>Masa (kg)<input type="number" name="caja.masa_kg" min="0" step="0.5"></label>
+        </div></fieldset>
+        <fieldset><legend>Pallet</legend><div class="grid">
+          <label>Tipo<select id="tipoPallet"><option value="europeo">Europeo</option><option value="americano">Americano</option><option value="industrial">Industrial</option><option value="">Otro</option></select></label>
+          <label>Largo<input type="number" name="pallet.largo_mm" min="100"></label>
+          <label>Ancho<input type="number" name="pallet.ancho_mm" min="100"></label>
+          <label>Alto<input type="number" name="pallet.alto_mm" min="0"></label>
+          <label>Capas<input type="number" name="capas" min="1" max="40"></label>
+          <label>Mosaico<select name="mosaico"><option value="alternado">Alternado</option><option value="columnas">Columnas</option></select></label>
+        </div></fieldset>
+        <details>
+          <summary>Avanzado: garra, movimiento y posiciones</summary>
+          <fieldset><legend>Garra</legend><div class="grid">
+            <label>Largo TCP<input type="number" name="garra.largo_tcp_mm" min="10"></label>
+            <label>Masa (kg)<input type="number" name="garra.masa_kg" min="0"></label>
+            <label>Aproximación<input type="number" name="movimiento.aproximacion_mm" min="0" step="50"></label>
+          </div></fieldset>
+          <fieldset><legend>Posiciones respecto a la base del robot</legend>
+            <label class="check" style="margin-bottom:8px"><input type="checkbox" id="auto" checked> Calcular automáticamente según el alcance</label>
+            <div class="grid">
+              <label>Pallet X<input type="number" name="pallet.centro_xy_mm.0" step="50"></label>
+              <label>Pallet Y<input type="number" name="pallet.centro_xy_mm.1" step="50"></label>
+              <label>Fin conveyor X<input type="number" name="conveyor.fin_xy_mm.0" step="50"></label>
+              <label>Fin conveyor Y<input type="number" name="conveyor.fin_xy_mm.1" step="50"></label>
+            </div>
+          </fieldset>
+        </details>
+      </form>
+    </section>
+  </div>
+
+  <div class="col">
+    <section class="card">
+      <h2>3. Vista previa</h2>
+      <div id="vista"></div>
+      <div class="fila">
+        <button id="play">▶ Simular apilado</button>
+        <input id="slider" type="range" min="0" value="0" aria-label="Cajas colocadas">
+        <span id="estadoAnim"></span>
+      </div>
+    </section>
+
+    <section class="card">
+      <h2>4. Resultado</h2>
+      <div class="kpis" id="kpis"></div>
+      <ul class="avisos" id="avisos"></ul>
+      <div class="acciones" style="margin-top:14px">
+        <button class="primario" id="simular">Simular en RobotStudio</button>
+        <button id="descargar">Descargar archivos</button>
+      </div>
+      <p class="nota" id="notaConexion"></p>
+      <pre id="log"></pre>
+    </section>
+  </div>
+</main>
+
+<script type="module">
+import * as G from "./generador.js";
+import { crearVista, controlesAnimacion } from "./vista3d.js";
+
+const $ = (id) => document.getElementById(id);
+const form = $("form");
+const API = location.port === "8765" ? "" : "http://localhost:8765";
+let spec = G.specPorDefecto();
+let resultado = null;
+let conectado = false;
+
+try { const g = localStorage.getItem("paletizado.spec"); if (g) spec = { ...spec, ...JSON.parse(g) }; } catch {}
+
+// ---- formulario <-> spec
+const sel = form.querySelector('[name="robot.modelo"]');
+for (const m of Object.keys(G.ROBOTS)) sel.add(new Option(m, m));
+const leer = (o, ruta) => ruta.split(".").reduce((a, k) => a?.[k], o);
+function escribir(o, ruta, v) {
+  const ks = ruta.split("."); const ult = ks.pop();
+  ks.reduce((a, k) => a[k], o)[ult] = v;
+}
+function specAFormulario() {
+  if (![...sel.options].some((o) => o.value === spec.robot.modelo)) sel.add(new Option(spec.robot.modelo, spec.robot.modelo));
+  for (const el of form.elements) if (el.name) el.value = leer(spec, el.name) ?? "";
+  const tipo = Object.entries(G.PALLETS).find(([, p]) => p.largo_mm === spec.pallet.largo_mm && p.ancho_mm === spec.pallet.ancho_mm);
+  $("tipoPallet").value = tipo ? tipo[0] : "";
+  bloquearPosiciones();
+}
+function formularioASpec() {
+  for (const el of form.elements) {
+    if (!el.name) continue;
+    escribir(spec, el.name, el.type === "number" ? (el.value === "" ? 0 : +el.value) : el.value);
+  }
+  if (G.ROBOTS[spec.robot.modelo]) Object.assign(spec.robot, G.ROBOTS[spec.robot.modelo]);
+}
+function bloquearPosiciones() {
+  for (const el of form.querySelectorAll('[name*="_xy_mm"]')) el.disabled = $("auto").checked;
+}
+
+// ---- generación
+const vista = crearVista($("vista"), (n, total, capa) => { $("estadoAnim").textContent = `${n}/${total} cajas · capa ${capa}`; });
+const anim = controlesAnimacion(vista, $("play"), $("slider"));
+
+function regenerar() {
+  formularioASpec();
+  if ($("auto").checked) G.layoutAutomatico(spec);
+  spec.nombre = G.nombreCelda(spec);
+  const t = $("texto").value.trim();
+  spec.descripcion = t || `${spec.robot.modelo}, cajas ${spec.caja.largo_mm}x${spec.caja.ancho_mm}x${spec.caja.alto_mm}, ` +
+    `pallet ${spec.pallet.largo_mm}x${spec.pallet.ancho_mm}, ${spec.capas} capas, mosaico ${spec.mosaico}`;
+  specAFormulario();
+  try {
+    resultado = G.generarTodo(structuredClone(spec));
+  } catch (e) {
+    resultado = null;
+    $("kpis").innerHTML = "";
+    $("avisos").innerHTML = `<li class="error">${e.message}</li>`;
+    actualizarBotones();
+    return;
+  }
+  try { localStorage.setItem("paletizado.spec", JSON.stringify(spec)); } catch {}
+  vista.actualizar(resultado.vista);
+  anim.reiniciar(resultado.vista.places.length);
+  const d = resultado.datos;
+  const porCapa = [...new Set(d.places.map((p) => p.capa))].map((k) => d.places.filter((p) => p.capa === k).length);
+  const kpi = (v, t) => `<div class="kpi"><b>${v}</b><span>${t}</span></div>`;
+  $("kpis").innerHTML =
+    kpi(d.places.length, `cajas en ${spec.capas} capas`) +
+    kpi([...new Set(porCapa)].join(" / "), "cajas por capa") +
+    kpi(`${spec.pallet.alto_mm + spec.capas * spec.caja.alto_mm} mm`, "altura del pallet cargado") +
+    kpi(`${d.checks.carga} kg`, `carga en muñeca (máx. ${spec.robot.carga_max_kg})`);
+  $("avisos").innerHTML = d.advertencias.map((a) => `<li>${a.replace(/[<>&]/g, "")}</li>`).join("");
+  actualizarBotones();
+}
+
+let espera;
+form.addEventListener("input", (e) => {
+  if (e.target.name?.startsWith("pallet.")) $("tipoPallet").value = "";
+  clearTimeout(espera); espera = setTimeout(regenerar, 250);
+});
+$("auto").addEventListener("change", () => { bloquearPosiciones(); regenerar(); });
+$("tipoPallet").addEventListener("change", (e) => {
+  if (G.PALLETS[e.target.value]) { formularioASpec(); Object.assign(spec.pallet, G.PALLETS[e.target.value]); specAFormulario(); regenerar(); }
+});
+$("interpretar").addEventListener("click", () => {
+  const { campos, encontrados } = G.interpretarTexto($("texto").value);
+  formularioASpec();
+  G.aplicarCampos(spec, campos);
+  specAFormulario();
+  $("encontrado").textContent = encontrados.length
+    ? `Reconocido: ${encontrados.join(", ")}. El resto mantiene el valor del formulario.`
+    : "No reconocí medidas en el texto; rellena el formulario.";
+  regenerar();
+});
+
+// ---- descargas
+function descargar(nombre, contenido) {
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(new Blob([contenido], { type: "text/plain" }));
+  a.download = nombre;
+  a.click();
+  setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+}
+$("descargar").addEventListener("click", () => {
+  if (!resultado) return;
+  for (const [n, c] of Object.entries(resultado.archivos)) descargar(`${spec.nombre}_${n}`, c);
+  descargar(`${spec.nombre}.json`, JSON.stringify(spec, null, 2));
+});
+
+// ---- RobotStudio
+const log = (t, clase) => {
+  const l = document.createElement("div");
+  l.textContent = t; if (clase) l.className = clase;
+  $("log").append(l); $("log").scrollTop = 1e9;
+};
+function actualizarBotones() {
+  $("simular").disabled = !resultado || !conectado;
+  $("notaConexion").textContent = conectado ? "" :
+    "Para simular, abre RobotStudio con la estación base y el complemento PaletizadoAddin (ver README). " +
+    "Mientras tanto puedes descargar los archivos.";
+}
+async function comprobarConexion() {
+  try {
+    const r = await fetch(`${API}/api/estado`, { cache: "no-store" });
+    const j = await r.json();
+    conectado = true;
+    $("conexion").textContent = `RobotStudio conectado · ${j.estacion || "sin estación abierta"}`;
+    $("conexion").className = "pill ok";
+  } catch {
+    conectado = false;
+    $("conexion").textContent = "RobotStudio no conectado";
+    $("conexion").className = "pill";
+  }
+  actualizarBotones();
+}
+$("simular").addEventListener("click", async () => {
+  if (!resultado) return;
+  $("simular").disabled = true;
+  $("log").textContent = "";
+  log(`Enviando ${spec.nombre} a RobotStudio…`);
+  let cuerpo = `#NOMBRE ${spec.nombre}\n`;
+  for (const n of ["estacion.txt", "MPaletizado.mod", "EIO_paletizado.cfg"]) cuerpo += `#ARCHIVO ${n}\n${resultado.archivos[n]}`;
+  try {
+    const r = await fetch(`${API}/api/simular`, { method: "POST", headers: { "Content-Type": "text/plain" }, body: cuerpo });
+    const j = await r.json();
+    for (const l of j.log || []) log(l);
+    log(j.ok ? "✔ Simulación iniciada en RobotStudio." : "✖ " + (j.error || "Error desconocido"), j.ok ? "" : "error");
+  } catch (e) {
+    log("✖ No se pudo contactar con RobotStudio: " + e.message, "error");
+  }
+  actualizarBotones();
+});
+
+specAFormulario();
+regenerar();
+comprobarConexion();
+setInterval(comprobarConexion, 5000);
+</script>
+</body>
+</html>

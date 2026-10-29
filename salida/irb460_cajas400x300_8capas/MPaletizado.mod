@@ -3,8 +3,8 @@ MODULE MPaletizado
     ! Celda: irb460_cajas400x300_8capas
     ! Robot IRB 460, conveyor 2000x600 a 800 mm, cajas 400x300x250, pallet europeo 1200x800, 8 capas, mosaico alternado
     ! Robot: IRB 460-110/2.4
-    ! Generado por generador/generar.py - no editar a mano,
-    ! cambia el JSON de la celda y vuelve a generar.
+    ! Generado por el generador de paletizado - no editar a mano,
+    ! cambia la celda y vuelve a generar.
     !
     ! Cajas por capa: 8, 7, 8, 7, 8, 7, 8, 7  (total 60)
     ! Senales necesarias (EIO_paletizado.cfg):
