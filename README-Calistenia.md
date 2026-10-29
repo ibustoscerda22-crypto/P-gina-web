@@ -17,7 +17,23 @@ en el teléfono; no necesita internet ni cuenta.
   historial. Al terminar marcas si fue Fácil, Bien o Difícil, y la app te sugiere subir de
   nivel cuando estás listo (6 sesiones en el nivel y las 3 últimas sin "Difícil").
 
-## Cómo instalarla en tu iPhone
+## Versión web para Android y iPhone (carpeta `docs/`)
+
+La carpeta `docs/` tiene la misma app hecha como **app web instalable** (PWA). Funciona en
+Android y en iPhone, se instala desde el navegador, funciona sin internet y guarda el
+progreso en el teléfono. No necesita Mac, Play Store ni App Store.
+
+**Publicarla (una sola vez):** en GitHub ve a *Settings → Pages*, en *Build and deployment*
+elige *Deploy from a branch*, rama `app-calistenia`, carpeta `/docs`, y presiona *Save*.
+En uno o dos minutos queda en https://ibustoscerda22-crypto.github.io/P-gina-web/
+
+**Instalarla:**
+- **Android (Chrome):** abre el enlace, menú ⋮ → *Instalar app* (o el botón "Instalar app" dentro de la misma app).
+- **iPhone (Safari):** abre el enlace, botón Compartir → *Agregar a inicio*.
+
+Para probarla en el computador: `cd docs && python3 -m http.server` y abre http://localhost:8000
+
+## Cómo instalar la versión nativa en tu iPhone
 
 La carpeta `Calistenia.swiftpm` es un proyecto de **Swift Playgrounds**. Tienes dos caminos:
 
