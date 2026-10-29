@@ -145,7 +145,7 @@
       <ul class="avisos" id="avisos"></ul>
       <div class="acciones" style="margin-top:14px">
         <button class="primario" id="simular">Simular en RobotStudio</button>
-        <button id="descargar">Descargar archivos</button>
+        <button id="descargar">Descargar .zip</button>
       </div>
       <p class="nota" id="notaConexion"></p>
       <pre id="log"></pre>
@@ -156,6 +156,7 @@
 <script type="module">
 import * as G from "./generador.js";
 import { crearVista, controlesAnimacion } from "./vista3d.js";
+import { crearZip } from "./zip.js";
 
 const $ = (id) => document.getElementById(id);
 const form = $("form");
@@ -248,18 +249,28 @@ $("interpretar").addEventListener("click", () => {
   regenerar();
 });
 
-// ---- descargas
-function descargar(nombre, contenido) {
+// ---- descarga: un .zip con todos los archivos de la celda.
+// Dentro del visor de artifacts de claude.ai se guarda con la capacidad "downloads";
+// en el resto de casos (localhost, archivo local) con un enlace normal.
+const visorClaude = window.claude?.use ? window.claude.use("downloads") : Promise.resolve(null);
+$("descargar").addEventListener("click", async () => {
+  if (!resultado) return;
+  const nombre = `${spec.nombre}.zip`;
+  const blob = new Blob([crearZip({
+    ...Object.fromEntries(Object.entries(resultado.archivos).map(([n, c]) => [`${spec.nombre}/${n}`, c])),
+    [`${spec.nombre}/${spec.nombre}.json`]: JSON.stringify(spec, null, 2) + "\n",
+  })], { type: "application/zip" });
+  const downloads = await visorClaude;
+  if (downloads) {
+    try { await downloads.save({ filename: nombre, data: blob }); }
+    catch (e) { if (e?.code !== "declined") log("No se pudo descargar: " + (e?.message || e), "error"); }
+    return;
+  }
   const a = document.createElement("a");
-  a.href = URL.createObjectURL(new Blob([contenido], { type: "text/plain" }));
+  a.href = URL.createObjectURL(blob);
   a.download = nombre;
   a.click();
   setTimeout(() => URL.revokeObjectURL(a.href), 1000);
-}
-$("descargar").addEventListener("click", () => {
-  if (!resultado) return;
-  for (const [n, c] of Object.entries(resultado.archivos)) descargar(`${spec.nombre}_${n}`, c);
-  descargar(`${spec.nombre}.json`, JSON.stringify(spec, null, 2));
 });
 
 // ---- RobotStudio

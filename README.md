@@ -33,7 +33,7 @@ La página genera:
 4. Revisa los datos, la vista 3D y las advertencias, y pulsa **Simular en RobotStudio**.
 
 Las posiciones del pallet y del conveyor se calculan solas según el alcance del robot. Puedes fijarlas a
-mano en *Avanzado*. **Descargar archivos** te da los mismos archivos para cargarlos sin el Add-in.
+mano en *Avanzado*. **Descargar .zip** te da los mismos archivos para cargarlos sin el Add-in.
 
 ## Instalación (una sola vez)
 
