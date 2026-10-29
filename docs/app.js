@@ -344,8 +344,10 @@ function vistaEjercicio(id) {
   return `
     <header class="barra"><a href="javascript:history.back()" class="volver">‹ Volver</a></header>
     <header class="titulo-grande"><h1>${esc(e.nombre)}</h1></header>
+    ${htmlDemo(e.id, "demo-grande")}
+    <a class="btn-video" href="${urlVideo(e)}" target="_blank" rel="noopener">▶ Ver videos en YouTube</a>
     <div class="ej-cabecera">
-      ${htmlIcono(e.categoria, "xl")}
+      ${htmlIcono(e.categoria)}
       <div>
         <small class="naranja negrita">${esc(CATEGORIAS[e.categoria].nombre.toUpperCase())}</small>
         <p class="secundario">${esc(e.musculos.join(" · "))}</p>
@@ -434,6 +436,7 @@ function render() {
   else html = vistaEntrenar();
 
   $("#vista").innerHTML = html;
+  activarDemos($("#vista"));
   document.querySelectorAll(".tabs a").forEach((a) => a.classList.toggle("activa", a.dataset.tab === pestana));
 }
 
@@ -722,7 +725,7 @@ const Entreno = {
       cuerpo = `
         <div class="paso">
           <small class="naranja negrita">SERIE ${p.serie} DE ${p.total}</small>
-          ${htmlIcono(e.categoria, "xl")}
+          ${htmlDemo(e.id, "demo-paso")}
           <h1>${esc(e.nombre)}</h1>
           ${p.lado ? `<p class="naranja negrita grande-texto">${p.lado}</p>` : ""}
           <div class="espacio"></div>
@@ -739,6 +742,7 @@ const Entreno = {
           ${this.htmlAnillo("var(--verde)")}
           <p class="secundario">Siguiente</p>
           <p class="grande-texto negrita">${esc(p.siguiente.nombre)}</p>
+          ${htmlDemo(p.siguiente.id, "demo-chica")}
           <div class="espacio"></div>
           <button class="btn-gris" data-e="mas15">+15 s</button>
           ${this.htmlControlesTiempo("Saltar descanso")}
@@ -753,6 +757,7 @@ const Entreno = {
       <div class="barra-progreso"><div style="width:${progreso}%"></div></div>
       ${cuerpo}
       <div class="hoja" hidden></div>`;
+    activarDemos($("#entreno"));
     this.actualizarAnillo();
   },
 
@@ -764,6 +769,8 @@ const Entreno = {
     hoja.innerHTML = `
       <div class="hoja-contenido">
         <div class="fila-titulo"><h2>${esc(e.nombre)}</h2><button class="enlace" data-e="cerrar-tecnica">Listo</button></div>
+        ${htmlDemo(e.id, "demo-grande")}
+        <a class="btn-video" href="${urlVideo(e)}" target="_blank" rel="noopener">▶ Ver videos en YouTube</a>
         <p>${esc(e.resumen)}</p>
         <h3>Cómo se hace</h3>
         <ol class="pasos">${e.pasos.map((x) => `<li>${esc(x)}</li>`).join("")}</ol>
@@ -771,6 +778,7 @@ const Entreno = {
         <ul class="errores">${e.errores.map((x) => `<li>${esc(x)}</li>`).join("")}</ul>
       </div>`;
     hoja.hidden = false;
+    activarDemos(hoja);
   },
 
   renderResumen() {

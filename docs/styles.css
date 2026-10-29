@@ -392,3 +392,41 @@ select {
 .sensacion span { font-size: 32px; }
 .sensacion.elegida { border-color: var(--naranja); background: var(--naranja-suave); }
 .resumen .btn.grande { margin-top: 8px; }
+
+/* Demostraciones animadas */
+.demo {
+  width: 100%;
+  background: var(--card);
+  border-radius: 16px;
+  box-shadow: var(--sombra);
+  padding: 8px;
+}
+.demo svg { display: block; width: 100%; height: auto; }
+.demo-grande { max-width: 420px; align-self: center; }
+.demo-paso { max-width: 240px; padding: 4px; }
+.demo-chica { max-width: 150px; padding: 4px; }
+.demo-suelo { stroke: var(--linea); stroke-width: 3; }
+.demo-objeto { fill: var(--gris); }
+.demo-poste { stroke: var(--secundario); stroke-width: 3; opacity: 0.5; }
+.demo-barra { stroke: var(--secundario); stroke-width: 5; stroke-linecap: round; }
+.demo-cerca *, .demo-lejos * {
+  fill: none;
+  stroke-width: 7;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+.demo-cerca * { stroke: var(--texto); }
+.demo-cerca circle { fill: var(--texto); stroke: none; }
+.demo-lejos * { stroke: var(--naranja); opacity: 0.55; }
+
+.btn-video {
+  align-self: center;
+  background: var(--naranja-suave);
+  color: var(--naranja);
+  font-weight: 700;
+  border-radius: 999px;
+  padding: 10px 18px;
+}
+.paso .anillo { width: 190px; height: 190px; }
+.paso .anillo-texto { font-size: 56px; }
+.reps strong { font-size: 92px; }
