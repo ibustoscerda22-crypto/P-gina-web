@@ -23,9 +23,11 @@ La carpeta `docs/` tiene la misma app hecha como **app web instalable** (PWA). F
 Android y en iPhone, se instala desde el navegador, funciona sin internet y guarda el
 progreso en el teléfono. No necesita Mac, Play Store ni App Store.
 
-Cada ejercicio tiene una **demostración animada** (`docs/demo.js`) que se ve en su ficha y
-durante el entrenamiento, y un botón **"Ver videos en YouTube"** que busca videos reales
-del ejercicio. Las animaciones funcionan sin internet; los videos de YouTube no.
+Cada ejercicio tiene un **video tutorial real** de YouTube que se reproduce dentro de la app
+(con enlaces para abrirlo en YouTube o buscar más videos) y una **guía animada** (`docs/demo.js`)
+que funciona sin internet y también aparece durante el entrenamiento. Los videos elegidos están
+en `VIDEOS` dentro de `docs/demo.js`; para cambiar uno, reemplaza su código (lo que va después
+de `watch?v=` en el enlace de YouTube).
 
 **Publicarla (una sola vez):** en GitHub ve a *Settings → Pages*, en *Build and deployment*
 elige *Deploy from a branch*, rama `app-calistenia`, carpeta `/docs`, y presiona *Save*.

@@ -1,5 +1,5 @@
 // Guarda la app en el teléfono para que funcione sin internet.
-const VERSION = "calistenia-v2";
+const VERSION = "calistenia-v3";
 const ARCHIVOS = [
   "./",
   "index.html",
@@ -28,7 +28,7 @@ self.addEventListener("activate", (ev) => {
 
 // Primero la red (para recibir actualizaciones); si no hay conexión, la copia guardada.
 self.addEventListener("fetch", (ev) => {
-  if (ev.request.method !== "GET") return;
+  if (ev.request.method !== "GET" || new URL(ev.request.url).origin !== location.origin) return;
   ev.respondWith(
     fetch(ev.request)
       .then((resp) => {

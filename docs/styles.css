@@ -11,6 +11,10 @@
   --azul: #2f7cf6;
   --rojo: #e5372b;
   --sombra: 0 1px 2px rgba(0, 0, 0, 0.04);
+  --piel: #e0a77f;
+  --short: #2c4a7c;
+  --zapato: #2b2b2b;
+  --pelo: #3a2a20;
   color-scheme: light;
 }
 
@@ -24,6 +28,9 @@
     --gris: #2c2c2e;
     --naranja-suave: rgba(249, 115, 22, 0.22);
     --verde: #34c759;
+    --short: #5a7fc4;
+    --zapato: #9a9aa0;
+    --pelo: #6b4a35;
     color-scheme: dark;
   }
 }
@@ -409,24 +416,56 @@ select {
 .demo-objeto { fill: var(--gris); }
 .demo-poste { stroke: var(--secundario); stroke-width: 3; opacity: 0.5; }
 .demo-barra { stroke: var(--secundario); stroke-width: 5; stroke-linecap: round; }
-.demo-cerca *, .demo-lejos * {
+.demo-cerca line, .demo-lejos line, .demo-cerca path {
   fill: none;
-  stroke-width: 7;
   stroke-linecap: round;
   stroke-linejoin: round;
 }
-.demo-cerca * { stroke: var(--texto); }
-.demo-cerca circle { fill: var(--texto); stroke: none; }
-.demo-lejos * { stroke: var(--naranja); opacity: 0.55; }
+.demo .piel { stroke: var(--piel); }
+.demo .brazo { stroke-width: 7.5; }
+.demo .ante { stroke-width: 6.5; }
+.demo .tibia { stroke-width: 8; }
+.demo .cuello { stroke-width: 6; }
+.demo .short { stroke: var(--short); stroke-width: 10.5; }
+.demo .zapato { stroke: var(--zapato); stroke-width: 5.5; }
+.demo .polera { stroke: var(--naranja); stroke-width: 15; }
+.demo .pelo { fill: var(--pelo); }
+.demo .cara { fill: var(--piel); }
+.demo-lejos { filter: brightness(0.72); }
 
-.btn-video {
-  align-self: center;
-  background: var(--naranja-suave);
-  color: var(--naranja);
-  font-weight: 700;
-  border-radius: 999px;
-  padding: 10px 18px;
+/* Video del ejercicio */
+.video {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  border-radius: 16px;
+  overflow: hidden;
+  background: #111;
 }
+.video iframe { position: absolute; inset: 0; width: 100%; height: 100%; border: 0; }
+.video-portada {
+  position: absolute; inset: 0;
+  border: 0; padding: 0; margin: 0;
+  background: #111; cursor: pointer;
+  display: grid; place-items: center;
+}
+.video-portada img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+.video-play {
+  position: relative;
+  width: 68px; height: 48px;
+  border-radius: 14px;
+  background: #ff0033;
+  color: #fff;
+  font-size: 22px;
+  display: grid; place-items: center;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.35);
+}
+.video-sin-red {
+  position: absolute; bottom: 10px; left: 0; right: 0;
+  color: #fff; font-size: 12px; opacity: 0.7;
+}
+.video-portada img ~ .video-sin-red { display: none; }
+.video-enlaces { display: flex; justify-content: center; gap: 20px; font-size: 14px; font-weight: 600; margin-top: -6px; }
 .paso .anillo { width: 190px; height: 190px; }
 .paso .anillo-texto { font-size: 56px; }
 .reps strong { font-size: 92px; }

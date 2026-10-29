@@ -344,8 +344,7 @@ function vistaEjercicio(id) {
   return `
     <header class="barra"><a href="javascript:history.back()" class="volver">‹ Volver</a></header>
     <header class="titulo-grande"><h1>${esc(e.nombre)}</h1></header>
-    ${htmlDemo(e.id, "demo-grande")}
-    <a class="btn-video" href="${urlVideo(e)}" target="_blank" rel="noopener">▶ Ver videos en YouTube</a>
+    ${htmlVideo(e)}
     <div class="ej-cabecera">
       ${htmlIcono(e.categoria)}
       <div>
@@ -354,6 +353,8 @@ function vistaEjercicio(id) {
       </div>
     </div>
     <p>${esc(e.resumen)}</p>
+    <h3>Guía animada <small class="secundario">(funciona sin internet)</small></h3>
+    ${htmlDemo(e.id, "demo-grande")}
     <h3>Cómo se hace</h3>
     <ol class="pasos">${e.pasos.map((p) => `<li>${esc(p)}</li>`).join("")}</ol>
     ${
@@ -731,7 +732,7 @@ const Entreno = {
           <div class="espacio"></div>
           ${objetivo}
           <div class="espacio"></div>
-          <button class="enlace" data-e="tecnica">ⓘ Ver técnica</button>
+          <button class="enlace" data-e="tecnica">ⓘ Ver técnica y video</button>
           ${controles}
         </div>`;
     } else {
@@ -769,8 +770,8 @@ const Entreno = {
     hoja.innerHTML = `
       <div class="hoja-contenido">
         <div class="fila-titulo"><h2>${esc(e.nombre)}</h2><button class="enlace" data-e="cerrar-tecnica">Listo</button></div>
+        ${htmlVideo(e)}
         ${htmlDemo(e.id, "demo-grande")}
-        <a class="btn-video" href="${urlVideo(e)}" target="_blank" rel="noopener">▶ Ver videos en YouTube</a>
         <p>${esc(e.resumen)}</p>
         <h3>Cómo se hace</h3>
         <ol class="pasos">${e.pasos.map((x) => `<li>${esc(x)}</li>`).join("")}</ol>

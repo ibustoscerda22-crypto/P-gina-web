@@ -468,6 +468,33 @@ const DEMOS = {
   },
 };
 
+// Video tutorial real (YouTube) de cada ejercicio.
+const VIDEOS = {
+  circulos_brazos: "YTueIW_xapc",
+  saltos_tijera: "CcSADh4EbXc",
+  gato_camello: "EeGZCFmRGQQ",
+  flexion_pared: "_ifxX0U-xrM",
+  flexion_inclinada: "uCTbmCjiF7Y",
+  flexion_rodillas: "QjN9gIpaOAQ",
+  flexion: "hI_KSc0XUIM",
+  fondos_banco: "V1K9BFx9OeM",
+  flexion_pike: "wyfxnKdBlzk",
+  colgado: "HIgYkLMDAvo",
+  escapulares: "QXZ5vZrjApY",
+  remo_invertido: "Qnf19U2GPUA",
+  dominada_negativa: "Szv52x_uYXA",
+  sentadilla: "RRx-NNdCRjA",
+  zancada: "PHA9tVMRsj8",
+  sentadilla_bulgara: "IdilLr9nyuQ",
+  puente_gluteo: "v_9dS-l3GWU",
+  elevacion_talones: "OKFDQOQAk6w",
+  plancha: "LKd2gK40YCY",
+  plancha_lateral: "3iTX7S0kONg",
+  bicho_muerto: "XkTtXA3-IqU",
+  hollow: "bfD5yo0Kw0k",
+  superman: "7p4l-KnxxaY",
+};
+
 // Búsquedas de YouTube más precisas para los nombres que se prestan a confusión.
 const BUSQUEDA_VIDEO = {
   gato_camello: "gato camello ejercicio movilidad columna",
@@ -480,10 +507,37 @@ const BUSQUEDA_VIDEO = {
   fondos_banco: "fondos en banco tríceps técnica",
 };
 
-function urlVideo(e) {
+function urlBusquedaVideo(e) {
   const q = BUSQUEDA_VIDEO[e.id] || `${e.nombre} ejercicio técnica correcta`;
   return `https://www.youtube.com/results?search_query=${encodeURIComponent(q)}`;
 }
+
+// Miniatura que se cambia por el reproductor al tocarla (así no se gastan datos antes).
+function htmlVideo(e) {
+  const id = VIDEOS[e.id];
+  if (!id) return "";
+  return `
+    <div class="video" data-video="${id}">
+      <button class="video-portada" data-reproducir aria-label="Reproducir video de ${e.nombre.replace(/"/g, "")}">
+        <img src="https://i.ytimg.com/vi/${id}/hqdefault.jpg" alt="" loading="lazy" onerror="this.remove()">
+        <span class="video-play">▶</span>
+        <span class="video-sin-red">Necesitas internet para ver el video</span>
+      </button>
+    </div>
+    <div class="video-enlaces">
+      <a href="https://www.youtube.com/watch?v=${id}" target="_blank" rel="noopener">Abrir en YouTube</a>
+      <a href="${urlBusquedaVideo(e)}" target="_blank" rel="noopener">Ver más videos</a>
+    </div>`;
+}
+
+document.addEventListener("click", (ev) => {
+  const boton = ev.target.closest("[data-reproducir]");
+  if (!boton) return;
+  const caja = boton.closest("[data-video]");
+  const id = caja.dataset.video;
+  caja.innerHTML = `<iframe src="https://www.youtube-nocookie.com/embed/${id}?autoplay=1&rel=0&playsinline=1"
+    title="Video del ejercicio" allow="autoplay; encrypted-media; picture-in-picture; fullscreen" allowfullscreen></iframe>`;
+});
 
 // ---------- Motor ----------
 
@@ -575,7 +629,6 @@ function poseEnTiempo(demo, ms) {
 }
 
 const NS = "http://www.w3.org/2000/svg";
-const puntos = (ps) => ps.map(([x, y]) => `${x.toFixed(1)},${y.toFixed(1)}`).join(" ");
 
 // Parte superior del encuadre: lo justo para que quepa todo el movimiento.
 function techoDemo(demo) {
@@ -614,18 +667,23 @@ function iniciarDemo(el) {
   if (!demo) return;
   el.dataset.activo = "1";
   const claseLejos = demo.frente ? "demo-cerca" : "demo-lejos";
+  const segmento = (nombre, clase) => `<line data-p="${nombre}" class="${clase}"/>`;
   const techo = techoDemo(demo);
   el.innerHTML = `
     <svg viewBox="0 ${techo} 200 ${SUELO + 10 - techo}" role="img" aria-label="Demostración animada">
       <line class="demo-suelo" x1="0" y1="${SUELO + 4}" x2="200" y2="${SUELO + 4}"/>
       ${htmlObjetos(demo.objetos, techo)}
       <g class="${claseLejos}">
-        <polyline data-p="brazoF"/><polyline data-p="piernaF"/><line data-p="pieF"/>
+        ${segmento("brazoF1", "piel brazo")}${segmento("brazoF2", "piel ante")}
+        ${segmento("piernaF1", "short")}${segmento("piernaF2", "piel tibia")}${segmento("pieF", "zapato")}
       </g>
       <g class="demo-cerca">
-        <path data-p="torso"/><line data-p="cuello"/>
-        <circle data-p="cabeza" r="${MEDIDAS.cabeza}"/>
-        <polyline data-p="piernaN"/><line data-p="pieN"/><polyline data-p="brazoN"/>
+        ${segmento("piernaN1", "short")}${segmento("piernaN2", "piel tibia")}${segmento("pieN", "zapato")}
+        <path data-p="torso" class="polera"/>
+        ${segmento("cuello", "piel cuello")}
+        <circle data-p="pelo" class="pelo" r="${MEDIDAS.cabeza + 0.5}"/>
+        <circle data-p="cara" class="cara" r="${MEDIDAS.cabeza - 1}"/>
+        ${segmento("brazoN1", "piel brazo")}${segmento("brazoN2", "piel ante")}
       </g>
     </svg>`;
   const partes = {};
@@ -644,12 +702,23 @@ function iniciarDemo(el) {
       `M${c.cadera[0].toFixed(1)},${c.cadera[1].toFixed(1)} Q${c.control[0].toFixed(1)},${c.control[1].toFixed(1)} ${c.hombro[0].toFixed(1)},${c.hombro[1].toFixed(1)}`
     );
     linea(partes.cuello, [c.hombro, c.cabeza]);
-    partes.cabeza.setAttribute("cx", c.cabeza[0].toFixed(1));
-    partes.cabeza.setAttribute("cy", c.cabeza[1].toFixed(1));
-    partes.brazoN.setAttribute("points", puntos(c.brazoN));
-    partes.brazoF.setAttribute("points", puntos(c.brazoF));
-    partes.piernaN.setAttribute("points", puntos(c.piernaN.puntos));
-    partes.piernaF.setAttribute("points", puntos(c.piernaF.puntos));
+    // Pelo detrás y arriba de la cabeza; la cara un poco hacia adelante.
+    const giro = p.torso + (p.cabeza || 0);
+    const adelante = demo.frente ? 0 : 1.6;
+    const pelo = mover(mover(c.cabeza, giro, 1.8), giro + 90, -adelante);
+    const cara = mover(c.cabeza, giro + 90, adelante);
+    partes.pelo.setAttribute("cx", pelo[0].toFixed(1));
+    partes.pelo.setAttribute("cy", pelo[1].toFixed(1));
+    partes.cara.setAttribute("cx", cara[0].toFixed(1));
+    partes.cara.setAttribute("cy", cara[1].toFixed(1));
+    linea(partes.brazoN1, [c.brazoN[0], c.brazoN[1]]);
+    linea(partes.brazoN2, [c.brazoN[1], c.brazoN[2]]);
+    linea(partes.brazoF1, [c.brazoF[0], c.brazoF[1]]);
+    linea(partes.brazoF2, [c.brazoF[1], c.brazoF[2]]);
+    linea(partes.piernaN1, [c.piernaN.puntos[0], c.piernaN.puntos[1]]);
+    linea(partes.piernaN2, [c.piernaN.puntos[1], c.piernaN.puntos[2]]);
+    linea(partes.piernaF1, [c.piernaF.puntos[0], c.piernaF.puntos[1]]);
+    linea(partes.piernaF2, [c.piernaF.puntos[1], c.piernaF.puntos[2]]);
     linea(partes.pieN, c.piernaN.pie);
     linea(partes.pieF, c.piernaF.pie);
   };
