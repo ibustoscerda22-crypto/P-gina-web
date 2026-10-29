@@ -1,0 +1,136 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Vista previa paletizado</title>
+<style>
+  :root { --bg:#f4f5f7; --panel:#ffffff; --texto:#1c1f24; --suave:#5d6470; --borde:#d9dce1; --acento:#1f5fbf; }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) { --bg:#15171a; --panel:#1f2226; --texto:#e8eaed; --suave:#a0a6b0; --borde:#34383e; --acento:#6ea0f0; }
+  }
+  :root[data-theme="dark"] { --bg:#15171a; --panel:#1f2226; --texto:#e8eaed; --suave:#a0a6b0; --borde:#34383e; --acento:#6ea0f0; }
+  * { box-sizing:border-box; }
+  html, body { margin:0; height:100%; background:var(--bg); color:var(--texto);
+    font:14px/1.4 system-ui, -apple-system, "Segoe UI", sans-serif; }
+  #escena { position:fixed; inset:0; }
+  .panel { position:fixed; left:16px; right:16px; bottom:16px; max-width:560px; margin:0 auto;
+    background:var(--panel); border:1px solid var(--borde); border-radius:10px; padding:12px 14px; }
+  .panel h1 { font-size:15px; margin:0 0 2px; }
+  .panel p { margin:0 0 8px; color:var(--suave); font-size:12.5px; }
+  .fila { display:flex; gap:10px; align-items:center; }
+  .fila input[type=range] { flex:1; accent-color:var(--acento); }
+  button { background:var(--acento); color:#fff; border:0; border-radius:6px; padding:6px 12px; font:inherit; cursor:pointer; }
+  #estado { font-variant-numeric:tabular-nums; min-width:150px; text-align:right; color:var(--suave); font-size:12.5px; }
+</style>
+<script type="importmap">
+{ "imports": {
+  "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
+  "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"
+} }
+</script>
+</head>
+<body>
+<div id="escena"></div>
+<div class="panel">
+  <h1 id="titulo"></h1>
+  <p id="desc"></p>
+  <div class="fila">
+    <button id="play">▶ Simular</button>
+    <input id="slider" type="range" min="0" value="0">
+    <span id="estado"></span>
+  </div>
+</div>
+<script type="module">
+import * as THREE from "three";
+import { OrbitControls } from "three/addons/controls/OrbitControls.js";
+
+const D = {"nombre": "irb460_cajas400x300_8capas", "descripcion": "Robot IRB 460, conveyor 2000x600 a 800 mm, cajas 400x300x250, pallet europeo 1200x800, 8 capas, mosaico alternado", "modelo": "IRB 460-110/2.4", "alcance": 2403, "suelo": 0, "partes": [{"nombre": "Conveyor", "color": [60, 60, 70], "t": [0, 0, 0], "oculto": false, "cajas": [[-1000.0, 900.0, 700, 2000, 600, 100], [-980.0, 900.0, 0, 80, 80, 700], [-980.0, 1420.0, 0, 80, 80, 700], [900.0, 900.0, 0, 80, 80, 700], [900.0, 1420.0, 0, 80, 80, 700]]}, {"nombre": "Conveyor_Tope", "color": [200, 160, 0], "t": [0, 0, 0], "oculto": false, "cajas": [[1000.0, 900.0, 800, 20, 600, 80]]}, {"nombre": "Pallet", "color": [196, 150, 90], "t": [0, 0, 0], "oculto": false, "cajas": [[1650.0, -600.0, 0, 100, 1200, 22], [1650.0, -600.0, 22, 100, 145, 78], [1650.0, -72.50000000000003, 22, 100, 145, 78], [1650.0, 455.0, 22, 100, 145, 78], [1300.0, -600.0, 0, 100, 1200, 22], [1300.0, -600.0, 22, 100, 145, 78], [1300.0, -72.5, 22, 100, 145, 78], [1300.0, 455.0, 22, 100, 145, 78], [950.0, -600.0, 0, 100, 1200, 22], [950.0, -600.0, 22, 100, 145, 78], [950.0, -72.49999999999997, 22, 100, 145, 78], [950.0, 455.0, 22, 100, 145, 78], [950.0, -600.0, 100, 800, 1200, 44]]}, {"nombre": "Caja", "color": [205, 160, 100], "t": [800.0, 1200.0, 800], "oculto": false, "cajas": [[-200.0, -150.0, 0, 400, 300, 250]]}, {"nombre": "Garra", "color": [40, 90, 200], "t": [0, -1600, 0], "oculto": false, "cajas": [[-100, -100, 0, 200, 200, 40], [-40, -40, 40, 80, 80, 130], [-220.0, -170.0, 170, 440, 340, 60], [-200.0, -150.0, 230, 400, 300, 20]]}], "places": [{"x": 1550.0, "y": -450.0, "z": 394, "capa": 1, "lx": 400, "ly": 300}, {"x": 1550.0, "y": 450.0, "z": 394, "capa": 1, "lx": 400, "ly": 300}, {"x": 1550.0, "y": -150.0, "z": 394, "capa": 1, "lx": 400, "ly": 300}, {"x": 1550.0, "y": 150.0, "z": 394, "capa": 1, "lx": 400, "ly": 300}, {"x": 1150.0, "y": -450.0, "z": 394, "capa": 1, "lx": 400, "ly": 300}, {"x": 1150.0, "y": 450.0, "z": 394, "capa": 1, "lx": 400, "ly": 300}, {"x": 1150.0, "y": -150.0, "z": 394, "capa": 1, "lx": 400, "ly": 300}, {"x": 1150.0, "y": 150.0, "z": 394, "capa": 1, "lx": 400, "ly": 300}, {"x": 1550.0, "y": -400.0, "z": 644, "capa": 2, "lx": 300, "ly": 400}, {"x": 1550.0, "y": 400.0, "z": 644, "capa": 2, "lx": 300, "ly": 400}, {"x": 1550.0, "y": -1.2246467991473532e-14, "z": 644, "capa": 2, "lx": 300, "ly": 400}, {"x": 1200.0, "y": -450.0, "z": 644, "capa": 2, "lx": 400, "ly": 300}, {"x": 1200.0, "y": 450.0, "z": 644, "capa": 2, "lx": 400, "ly": 300}, {"x": 1200.0, "y": -150.0, "z": 644, "capa": 2, "lx": 400, "ly": 300}, {"x": 1200.0, "y": 150.0, "z": 644, "capa": 2, "lx": 400, "ly": 300}, {"x": 1550.0, "y": -450.0, "z": 894, "capa": 3, "lx": 400, "ly": 300}, {"x": 1550.0, "y": 450.0, "z": 894, "capa": 3, "lx": 400, "ly": 300}, {"x": 1550.0, "y": -150.0, "z": 894, "capa": 3, "lx": 400, "ly": 300}, {"x": 1550.0, "y": 150.0, "z": 894, "capa": 3, "lx": 400, "ly": 300}, {"x": 1150.0, "y": -450.0, "z": 894, "capa": 3, "lx": 400, "ly": 300}, {"x": 1150.0, "y": 450.0, "z": 894, "capa": 3, "lx": 400, "ly": 300}, {"x": 1150.0, "y": -150.0, "z": 894, "capa": 3, "lx": 400, "ly": 300}, {"x": 1150.0, "y": 150.0, "z": 894, "capa": 3, "lx": 400, "ly": 300}, {"x": 1500.0, "y": 450.0, "z": 1144, "capa": 4, "lx": 400, "ly": 300}, {"x": 1500.0, "y": -450.0, "z": 1144, "capa": 4, "lx": 400, "ly": 300}, {"x": 1500.0, "y": 150.0, "z": 1144, "capa": 4, "lx": 400, "ly": 300}, {"x": 1500.0, "y": -150.0, "z": 1144, "capa": 4, "lx": 400, "ly": 300}, {"x": 1150.0, "y": 400.0, "z": 1144, "capa": 4, "lx": 300, "ly": 400}, {"x": 1150.0, "y": -400.0, "z": 1144, "capa": 4, "lx": 300, "ly": 400}, {"x": 1150.0, "y": 1.2246467991473532e-14, "z": 1144, "capa": 4, "lx": 300, "ly": 400}, {"x": 1550.0, "y": -450.0, "z": 1394, "capa": 5, "lx": 400, "ly": 300}, {"x": 1550.0, "y": 450.0, "z": 1394, "capa": 5, "lx": 400, "ly": 300}, {"x": 1550.0, "y": -150.0, "z": 1394, "capa": 5, "lx": 400, "ly": 300}, {"x": 1550.0, "y": 150.0, "z": 1394, "capa": 5, "lx": 400, "ly": 300}, {"x": 1150.0, "y": -450.0, "z": 1394, "capa": 5, "lx": 400, "ly": 300}, {"x": 1150.0, "y": 450.0, "z": 1394, "capa": 5, "lx": 400, "ly": 300}, {"x": 1150.0, "y": -150.0, "z": 1394, "capa": 5, "lx": 400, "ly": 300}, {"x": 1150.0, "y": 150.0, "z": 1394, "capa": 5, "lx": 400, "ly": 300}, {"x": 1550.0, "y": -400.0, "z": 1644, "capa": 6, "lx": 300, "ly": 400}, {"x": 1550.0, "y": 400.0, "z": 1644, "capa": 6, "lx": 300, "ly": 400}, {"x": 1550.0, "y": -1.2246467991473532e-14, "z": 1644, "capa": 6, "lx": 300, "ly": 400}, {"x": 1200.0, "y": -450.0, "z": 1644, "capa": 6, "lx": 400, "ly": 300}, {"x": 1200.0, "y": 450.0, "z": 1644, "capa": 6, "lx": 400, "ly": 300}, {"x": 1200.0, "y": -150.0, "z": 1644, "capa": 6, "lx": 400, "ly": 300}, {"x": 1200.0, "y": 150.0, "z": 1644, "capa": 6, "lx": 400, "ly": 300}, {"x": 1550.0, "y": -450.0, "z": 1894, "capa": 7, "lx": 400, "ly": 300}, {"x": 1550.0, "y": 450.0, "z": 1894, "capa": 7, "lx": 400, "ly": 300}, {"x": 1550.0, "y": -150.0, "z": 1894, "capa": 7, "lx": 400, "ly": 300}, {"x": 1550.0, "y": 150.0, "z": 1894, "capa": 7, "lx": 400, "ly": 300}, {"x": 1150.0, "y": -450.0, "z": 1894, "capa": 7, "lx": 400, "ly": 300}, {"x": 1150.0, "y": 450.0, "z": 1894, "capa": 7, "lx": 400, "ly": 300}, {"x": 1150.0, "y": -150.0, "z": 1894, "capa": 7, "lx": 400, "ly": 300}, {"x": 1150.0, "y": 150.0, "z": 1894, "capa": 7, "lx": 400, "ly": 300}, {"x": 1500.0, "y": 450.0, "z": 2144, "capa": 8, "lx": 400, "ly": 300}, {"x": 1500.0, "y": -450.0, "z": 2144, "capa": 8, "lx": 400, "ly": 300}, {"x": 1500.0, "y": 150.0, "z": 2144, "capa": 8, "lx": 400, "ly": 300}, {"x": 1500.0, "y": -150.0, "z": 2144, "capa": 8, "lx": 400, "ly": 300}, {"x": 1150.0, "y": 400.0, "z": 2144, "capa": 8, "lx": 300, "ly": 400}, {"x": 1150.0, "y": -400.0, "z": 2144, "capa": 8, "lx": 300, "ly": 400}, {"x": 1150.0, "y": 1.2246467991473532e-14, "z": 2144, "capa": 8, "lx": 300, "ly": 400}], "alto_caja": 250};
+const S = 0.001; // mm -> m
+document.getElementById("titulo").textContent = `${D.nombre} — ${D.modelo}`;
+document.getElementById("desc").textContent = D.descripcion;
+
+const host = document.getElementById("escena");
+const renderer = new THREE.WebGLRenderer({ antialias: true });
+renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+host.appendChild(renderer.domElement);
+const scene = new THREE.Scene();
+const oscuro = matchMedia("(prefers-color-scheme: dark)").matches;
+scene.background = new THREE.Color(oscuro ? 0x15171a : 0xf4f5f7);
+const camera = new THREE.PerspectiveCamera(45, 1, 0.05, 100);
+camera.up.set(0, 0, 1);
+camera.position.set(-3.2, -3.6, 3.4);
+const controls = new OrbitControls(camera, renderer.domElement);
+controls.target.set(0.9, 0.4, 0.8);
+scene.add(new THREE.HemisphereLight(0xffffff, 0x666666, 1.6));
+const sol = new THREE.DirectionalLight(0xffffff, 1.4); sol.position.set(-3, -4, 6); scene.add(sol);
+
+const suelo = new THREE.Mesh(new THREE.PlaneGeometry(8, 8),
+  new THREE.MeshStandardMaterial({ color: oscuro ? 0x2a2d31 : 0xe2e4e8 }));
+suelo.position.z = D.suelo * S; scene.add(suelo);
+const grid = new THREE.GridHelper(8, 16, 0x888888, oscuro ? 0x3a3d42 : 0xc8cbd0);
+grid.rotation.x = Math.PI / 2; grid.position.z = D.suelo * S + 0.001; scene.add(grid);
+
+function caja(x0, y0, z0, lx, ly, lz, color) {
+  const m = new THREE.Mesh(new THREE.BoxGeometry(lx * S, ly * S, lz * S),
+    new THREE.MeshStandardMaterial({ color }));
+  m.position.set((x0 + lx / 2) * S, (y0 + ly / 2) * S, (z0 + lz / 2) * S);
+  const bordes = new THREE.LineSegments(new THREE.EdgesGeometry(m.geometry),
+    new THREE.LineBasicMaterial({ color: 0x000000, transparent: true, opacity: 0.25 }));
+  m.add(bordes);
+  return m;
+}
+const rgb = c => (c[0] << 16) | (c[1] << 8) | c[2];
+for (const p of D.partes) {
+  if (p.nombre === "Garra") continue;
+  const g = new THREE.Group();
+  g.position.set(p.t[0] * S, p.t[1] * S, p.t[2] * S);
+  for (const b of p.cajas) g.add(caja(...b, rgb(p.color)));
+  scene.add(g);
+}
+// Robot esquemático: base y columna + círculo de alcance a la altura de la base
+const robot = new THREE.Group();
+robot.add(caja(-350, -350, D.suelo, 700, 700, -D.suelo + 300, 0xe8a317));
+robot.add(caja(-200, -200, 300, 400, 400, 600, 0xe8a317));
+scene.add(robot);
+const anillo = new THREE.Mesh(new THREE.RingGeometry(D.alcance * S - 0.01, D.alcance * S, 128),
+  new THREE.MeshBasicMaterial({ color: 0xe8a317, side: THREE.DoubleSide }));
+anillo.position.z = D.suelo * S + 0.003; scene.add(anillo);
+
+const cajas = D.places.map(p => {
+  const m = caja(p.x - p.lx / 2 + 1, p.y - p.ly / 2 + 1, p.z - D.alto_caja + 1, p.lx - 2, p.ly - 2, D.alto_caja - 2,
+    p.capa % 2 ? 0xcd9f64 : 0xb8854a);
+  m.visible = false; scene.add(m); return m;
+});
+const slider = document.getElementById("slider");
+const estado = document.getElementById("estado");
+slider.max = cajas.length;
+function mostrar(n) {
+  cajas.forEach((c, i) => c.visible = i < n);
+  const capa = n ? D.places[n - 1].capa : 0;
+  estado.textContent = `${n}/${cajas.length} cajas · capa ${capa}`;
+}
+slider.addEventListener("input", () => { parar(); mostrar(+slider.value); });
+let timer = null;
+const play = document.getElementById("play");
+function parar() { clearInterval(timer); timer = null; play.textContent = "▶ Simular"; }
+play.addEventListener("click", () => {
+  if (timer) return parar();
+  if (+slider.value >= cajas.length) slider.value = 0;
+  play.textContent = "⏸ Pausa";
+  timer = setInterval(() => {
+    slider.value = +slider.value + 1; mostrar(+slider.value);
+    if (+slider.value >= cajas.length) parar();
+  }, 180);
+});
+mostrar(cajas.length); slider.value = cajas.length;
+
+function tam() {
+  const w = host.clientWidth, h = host.clientHeight;
+  renderer.setSize(w, h); camera.aspect = w / h; camera.updateProjectionMatrix();
+}
+addEventListener("resize", tam); tam();
+renderer.setAnimationLoop(() => { controls.update(); renderer.render(scene, camera); });
+</script>
+</body>
+</html>

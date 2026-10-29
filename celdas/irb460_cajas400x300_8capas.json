@@ -1,0 +1,42 @@
+{
+  "nombre": "irb460_cajas400x300_8capas",
+  "descripcion": "Robot IRB 460, conveyor 2000x600 a 800 mm, cajas 400x300x250, pallet europeo 1200x800, 8 capas, mosaico alternado",
+  "robot": {
+    "modelo": "IRB 460-110/2.4",
+    "alcance_mm": 2403,
+    "carga_max_kg": 110,
+    "base_z_mm": 0
+  },
+  "conveyor": {
+    "largo_mm": 2000,
+    "ancho_mm": 600,
+    "altura_mm": 800,
+    "fin_xy_mm": [1000, 1200],
+    "direccion_deg": 0
+  },
+  "caja": {
+    "largo_mm": 400,
+    "ancho_mm": 300,
+    "alto_mm": 250,
+    "masa_kg": 15
+  },
+  "pallet": {
+    "largo_mm": 1200,
+    "ancho_mm": 800,
+    "alto_mm": 144,
+    "centro_xy_mm": [1350, 0],
+    "rotacion_deg": 90
+  },
+  "capas": 8,
+  "mosaico": "alternado",
+  "garra": {
+    "largo_tcp_mm": 250,
+    "masa_kg": 40
+  },
+  "movimiento": {
+    "aproximacion_mm": 300,
+    "vel_rapida": "v2000",
+    "vel_aprox": "v1000",
+    "vel_lenta": "v300"
+  }
+}

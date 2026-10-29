@@ -1,0 +1,39 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!--
+    Add-in de RobotStudio que construye la celda a partir de salida/<celda>/estacion.txt.
+    RobotStudioDir debe apuntar a la carpeta de instalación de RobotStudio 2025
+    (la que contiene Bin\ABB.Robotics.RobotStudio.dll). Ajusta la ruta si tu instalación es otra:
+      dotnet build -c Release -p:RobotStudioDir="D:\ABB\RobotStudio 2025"
+  -->
+  <PropertyGroup>
+    <TargetFramework>net8.0-windows</TargetFramework>
+    <UseWindowsForms>true</UseWindowsForms>
+    <OutputType>Library</OutputType>
+    <AssemblyName>PaletizadoAddin</AssemblyName>
+    <RootNamespace>PaletizadoAddin</RootNamespace>
+    <Nullable>disable</Nullable>
+    <PlatformTarget>x64</PlatformTarget>
+    <RobotStudioDir Condition="'$(RobotStudioDir)' == ''">C:\Program Files (x86)\ABB\RobotStudio 2025</RobotStudioDir>
+  </PropertyGroup>
+  <ItemGroup>
+    <Reference Include="ABB.Robotics.Math">
+      <HintPath>$(RobotStudioDir)\Bin\ABB.Robotics.Math.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="ABB.Robotics.RobotStudio">
+      <HintPath>$(RobotStudioDir)\Bin\ABB.Robotics.RobotStudio.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="ABB.Robotics.RobotStudio.Environment">
+      <HintPath>$(RobotStudioDir)\Bin\ABB.Robotics.RobotStudio.Environment.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="ABB.Robotics.RobotStudio.Stations">
+      <HintPath>$(RobotStudioDir)\Bin\ABB.Robotics.RobotStudio.Stations.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+  </ItemGroup>
+  <ItemGroup>
+    <None Update="PaletizadoAddin.rsaddin" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+</Project>
