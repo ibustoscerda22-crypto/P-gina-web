@@ -275,10 +275,10 @@ function vistaRutina(id) {
     <h4 class="seccion">EJERCICIOS</h4>
     <div class="card lista">
       ${r.bloques
-        .map((b) => {
+        .map((b, i) => {
           const e = ejercicio(b.ejercicio);
           return `
-          <a class="fila" href="#/ejercicio/${e.id}">
+          <a class="fila" href="#/rutina/${r.id}/${i}">
             ${htmlIcono(e.categoria)}
             <span class="fila-texto">
               <strong>${esc(e.nombre)}</strong>
@@ -293,6 +293,48 @@ function vistaRutina(id) {
     <p class="nota">Los dos primeros ejercicios son de calentamiento. Toca cualquier ejercicio para ver cómo se hace y sus versiones más fáciles o difíciles.</p>
     <div class="pie-fijo">
       <button class="btn grande" data-accion="empezar" data-rutina="${r.id}">▶ Empezar entrenamiento</button>
+    </div>`;
+}
+
+// Detalle de un ejercicio dentro de la rutina: foto, series y paso al anterior/siguiente.
+function vistaBloque(idRutina, i) {
+  const r = RUTINA_POR_ID[idRutina];
+  const b = r && r.bloques[i];
+  if (!b) return vistaNoEncontrada();
+  const e = ejercicio(b.ejercicio);
+  const total = r.bloques.length;
+  const objetivo =
+    b.reps != null
+      ? `<span class="pill"><strong>${b.reps}</strong> rep</span>`
+      : `<span class="pill"><strong>${b.segundos}</strong> seg</span>`;
+  const series = Array.from({ length: b.series }, (_, k) => `
+    <div class="serie">
+      <span>Serie ${k + 1}</span>
+      ${objetivo}
+      ${b.porLado ? `<span class="pill suave">por lado</span>` : ""}
+    </div>
+    ${k < b.series - 1 || i < total - 1 ? `<div class="serie-descanso"><span><strong>${b.descanso}</strong> seg</span></div>` : ""}`).join("");
+  const enlace = (j, simbolo, etiqueta) =>
+    j >= 0 && j < total
+      ? `<a class="nav-btn" href="#/rutina/${r.id}/${j}" aria-label="${etiqueta}">${simbolo}</a>`
+      : `<span class="nav-btn apagado" aria-hidden="true">${simbolo}</span>`;
+  return `
+    <header class="barra"><a href="#/rutina/${r.id}" class="volver">‹ ${esc(r.nombre)}</a></header>
+    <div class="detalle-cab">
+      <small class="secundario">${esc(CATEGORIAS[e.categoria].nombre.toUpperCase())} · ${esc(e.musculos.join(", "))}</small>
+      <h1>${esc(e.nombre)}</h1>
+    </div>
+    ${htmlMedia(e, "grande")}
+    <div class="card series">${series}</div>
+    <a class="fila card" href="#/ejercicio/${e.id}">
+      <span class="fila-texto"><strong>Cómo se hace y video</strong><small>${esc(e.resumen)}</small></span>
+      <span class="chevron">›</span>
+    </a>
+    <div class="pie-fijo nav-ejercicios">
+      <span class="secundario negrita">${i + 1}/${total}</span>
+      <span class="espacio-flex"></span>
+      ${enlace(i - 1, "‹", "Ejercicio anterior")}
+      ${enlace(i + 1, "›", "Ejercicio siguiente")}
     </div>`;
 }
 
@@ -344,7 +386,7 @@ function vistaEjercicio(id) {
   return `
     <header class="barra"><a href="javascript:history.back()" class="volver">‹ Volver</a></header>
     <header class="titulo-grande"><h1>${esc(e.nombre)}</h1></header>
-    ${htmlVideo(e)}
+    ${htmlMedia(e, "grande")}
     <div class="ej-cabecera">
       ${htmlIcono(e.categoria)}
       <div>
@@ -353,8 +395,9 @@ function vistaEjercicio(id) {
       </div>
     </div>
     <p>${esc(e.resumen)}</p>
-    <h3>Guía animada <small class="secundario">(funciona sin internet)</small></h3>
-    ${htmlDemo(e.id, "demo-grande")}
+    <h3>Video explicativo</h3>
+    ${htmlVideo(e)}
+    ${FOTOS[e.id] ? `<h3>Guía animada <small class="secundario">(funciona sin internet)</small></h3>${htmlDemo(e.id, "demo-grande")}` : ""}
     <h3>Cómo se hace</h3>
     <ol class="pasos">${e.pasos.map((p) => `<li>${esc(p)}</li>`).join("")}</ol>
     ${
@@ -430,7 +473,8 @@ function render() {
   const partes = ruta.split("/").filter(Boolean);
   let html;
   let pestana = "entrenar";
-  if (partes[0] === "rutina") html = vistaRutina(partes[1]);
+  if (partes[0] === "rutina" && partes[2] != null) html = vistaBloque(partes[1], Number(partes[2]));
+  else if (partes[0] === "rutina") html = vistaRutina(partes[1]);
   else if (partes[0] === "ejercicios") (html = vistaEjercicios()), (pestana = "ejercicios");
   else if (partes[0] === "ejercicio") (html = vistaEjercicio(partes[1])), (pestana = "ejercicios");
   else if (partes[0] === "progreso") (html = vistaProgreso()), (pestana = "progreso");
@@ -726,7 +770,7 @@ const Entreno = {
       cuerpo = `
         <div class="paso">
           <small class="naranja negrita">SERIE ${p.serie} DE ${p.total}</small>
-          ${htmlDemo(e.id, "demo-paso")}
+          ${htmlMedia(e, "paso")}
           <h1>${esc(e.nombre)}</h1>
           ${p.lado ? `<p class="naranja negrita grande-texto">${p.lado}</p>` : ""}
           <div class="espacio"></div>
@@ -743,7 +787,7 @@ const Entreno = {
           ${this.htmlAnillo("var(--verde)")}
           <p class="secundario">Siguiente</p>
           <p class="grande-texto negrita">${esc(p.siguiente.nombre)}</p>
-          ${htmlDemo(p.siguiente.id, "demo-chica")}
+          ${htmlMedia(p.siguiente, "chica")}
           <div class="espacio"></div>
           <button class="btn-gris" data-e="mas15">+15 s</button>
           ${this.htmlControlesTiempo("Saltar descanso")}
@@ -770,8 +814,8 @@ const Entreno = {
     hoja.innerHTML = `
       <div class="hoja-contenido">
         <div class="fila-titulo"><h2>${esc(e.nombre)}</h2><button class="enlace" data-e="cerrar-tecnica">Listo</button></div>
+        ${htmlMedia(e, "grande")}
         ${htmlVideo(e)}
-        ${htmlDemo(e.id, "demo-grande")}
         <p>${esc(e.resumen)}</p>
         <h3>Cómo se hace</h3>
         <ol class="pasos">${e.pasos.map((x) => `<li>${esc(x)}</li>`).join("")}</ol>

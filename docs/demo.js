@@ -468,6 +468,27 @@ const DEMOS = {
   },
 };
 
+// Fotos reales de cada ejercicio (posición inicial y final), de Free Exercise DB,
+// colección de dominio público: https://github.com/yuhonas/free-exercise-db
+const FOTOS = {
+  circulos_brazos: 2, saltos_tijera: 2, gato_camello: 2, flexion_inclinada: 2, flexion: 2,
+  fondos_banco: 2, colgado: 1, escapulares: 2, remo_invertido: 2, dominada_negativa: 2,
+  sentadilla: 2, zancada: 2, puente_gluteo: 2, plancha: 1, plancha_lateral: 2,
+  bicho_muerto: 2, superman: 2,
+};
+
+// Foto real si existe (alternando inicio y final); si no, la figura animada.
+// tamano: "grande" | "paso" | "chica"
+function htmlMedia(e, tamano) {
+  const n = FOTOS[e.id];
+  if (!n) return htmlDemo(e.id, `demo-${tamano}`);
+  const nombre = e.nombre.replace(/"/g, "");
+  const imgs = Array.from({ length: n }, (_, i) =>
+    `<img src="fotos/${e.id}-${i + 1}.jpg" alt="${i === 0 ? "Posición inicial" : "Posición final"}: ${nombre}">`
+  ).join("");
+  return `<div class="fotos fotos-${tamano} ${n > 1 ? "fotos-mov" : ""}">${imgs}</div>`;
+}
+
 // Video tutorial real (YouTube) de cada ejercicio.
 const VIDEOS = {
   circulos_brazos: "YTueIW_xapc",

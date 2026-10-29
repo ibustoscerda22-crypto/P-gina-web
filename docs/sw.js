@@ -1,5 +1,5 @@
 // Guarda la app en el teléfono para que funcione sin internet.
-const VERSION = "calistenia-v3";
+const VERSION = "calistenia-v4";
 const ARCHIVOS = [
   "./",
   "index.html",

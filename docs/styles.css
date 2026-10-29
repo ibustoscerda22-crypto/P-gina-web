@@ -469,3 +469,59 @@ select {
 .paso .anillo { width: 190px; height: 190px; }
 .paso .anillo-texto { font-size: 56px; }
 .reps strong { font-size: 92px; }
+
+/* Fotos reales del ejercicio */
+.fotos {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 3 / 2;
+  border-radius: 16px;
+  overflow: hidden;
+  background: #1a1a1a;
+  box-shadow: var(--sombra);
+}
+.fotos img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+.fotos-mov img:nth-child(2) { animation: alternar-foto 2.6s ease-in-out infinite; }
+@keyframes alternar-foto {
+  0%, 38% { opacity: 0; }
+  50%, 88% { opacity: 1; }
+  100% { opacity: 0; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .fotos-mov img:nth-child(2) { animation-duration: 6s; }
+}
+.fotos-paso { max-width: 360px; }
+.fotos-chica { max-width: 200px; }
+
+/* Detalle del ejercicio dentro de la rutina */
+.detalle-cab { display: flex; flex-direction: column; gap: 4px; }
+.detalle-cab h1 { font-size: 28px; }
+.series { gap: 0; padding: 8px 16px; }
+.serie { display: flex; align-items: center; gap: 10px; padding: 10px 0; }
+.serie > span:first-child { width: 72px; font-size: 17px; }
+.pill {
+  border: 1px solid var(--linea);
+  background: var(--fondo);
+  border-radius: 10px;
+  padding: 6px 12px;
+  color: var(--secundario);
+  font-size: 14px;
+}
+.pill strong { color: var(--texto); font-size: 22px; font-variant-numeric: tabular-nums; margin-right: 2px; }
+.pill.suave { font-size: 13px; }
+.serie-descanso { display: flex; align-items: center; gap: 12px; color: var(--secundario); font-size: 14px; }
+.serie-descanso::before, .serie-descanso::after { content: ""; height: 1px; background: var(--linea); }
+.serie-descanso::before { width: 72px; }
+.serie-descanso::after { flex: 1; }
+.serie-descanso strong { color: var(--texto); font-size: 18px; margin-right: 2px; }
+.nav-ejercicios { display: flex; align-items: center; gap: 10px; }
+.espacio-flex { flex: 1; }
+.nav-btn {
+  width: 64px; height: 52px;
+  border-radius: 14px;
+  background: var(--gris);
+  color: var(--texto);
+  display: grid; place-items: center;
+  font-size: 30px; line-height: 1;
+}
+.nav-btn.apagado { opacity: 0.35; }

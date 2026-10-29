@@ -23,6 +23,13 @@ La carpeta `docs/` tiene la misma app hecha como **app web instalable** (PWA). F
 Android y en iPhone, se instala desde el navegador, funciona sin internet y guarda el
 progreso en el teléfono. No necesita Mac, Play Store ni App Store.
 
+**Fotos reales:** 17 de los 23 ejercicios muestran fotos de una persona real (posición inicial y
+final, alternándose) en `docs/fotos/`. Vienen de [Free Exercise DB](https://github.com/yuhonas/free-exercise-db),
+una colección de dominio público (Unlicense), así que se pueden usar libremente. Los 6 que no están
+en esa colección (flexión en pared, de rodillas y pike, sentadilla búlgara, elevación de talones y
+hollow) usan la figura animada. Dentro de cada rutina, al tocar un ejercicio se abre su detalle con
+la foto, las series (repeticiones y descanso) y botones para pasar al anterior o al siguiente.
+
 Cada ejercicio tiene un **video tutorial real** de YouTube que se reproduce dentro de la app
 (con enlaces para abrirlo en YouTube o buscar más videos) y una **guía animada** (`docs/demo.js`)
 que funciona sin internet y también aparece durante el entrenamiento. Los videos elegidos están
