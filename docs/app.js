@@ -397,7 +397,7 @@ function vistaEjercicio(id) {
     <p>${esc(e.resumen)}</p>
     <h3>Video explicativo</h3>
     ${htmlVideo(e)}
-    ${FOTOS[e.id] ? `<h3>Guía animada <small class="secundario">(funciona sin internet)</small></h3>${htmlDemo(e.id, "demo-grande")}` : ""}
+    ${FOTOS[e.id] ? `<h3>Fotos reales</h3>${htmlFotos(e)}` : ""}
     <h3>Cómo se hace</h3>
     <ol class="pasos">${e.pasos.map((p) => `<li>${esc(p)}</li>`).join("")}</ol>
     ${

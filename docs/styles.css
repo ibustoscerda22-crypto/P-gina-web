@@ -400,38 +400,56 @@ select {
 .sensacion.elegida { border-color: var(--naranja); background: var(--naranja-suave); }
 .resumen .btn.grande { margin-top: 8px; }
 
-/* Demostraciones animadas */
+/* Video animado del ejercicio (estudio gris, como un video) */
 .demo {
+  position: relative;
   width: 100%;
-  background: var(--card);
   border-radius: 16px;
+  overflow: hidden;
+  background: #c9c9d1;
   box-shadow: var(--sombra);
-  padding: 8px;
+  cursor: pointer;
+  align-self: center;
 }
 .demo svg { display: block; width: 100%; height: auto; }
-.demo-grande { max-width: 420px; align-self: center; }
-.demo-paso { max-width: 240px; padding: 4px; }
-.demo-chica { max-width: 150px; padding: 4px; }
-.demo-suelo { stroke: var(--linea); stroke-width: 3; }
-.demo-objeto { fill: var(--gris); }
-.demo-poste { stroke: var(--secundario); stroke-width: 3; opacity: 0.5; }
-.demo-barra { stroke: var(--secundario); stroke-width: 5; stroke-linecap: round; }
-.demo-cerca line, .demo-lejos line, .demo-cerca path {
-  fill: none;
-  stroke-linecap: round;
-  stroke-linejoin: round;
+.demo-paso { max-width: 380px; }
+.demo-chica { max-width: 220px; cursor: default; }
+.cuerpo .piel { fill: #d39b74; }
+.cuerpo .polera { fill: #1e1e22; }
+.cuerpo .short { fill: #2e2e34; }
+.cuerpo .zapatilla { fill: #f97316; }
+.cuerpo .pelo { fill: #2a1c13; }
+.cuerpo.lejos { filter: brightness(0.78); }
+.obj-caja { fill: #3a3a41; }
+.obj-caja-tapa { fill: #56565f; }
+.obj-pared { fill: #e3e3e8; }
+.obj-poste { stroke: #5a5a62; stroke-width: 3.5; }
+.obj-barra { stroke: #2b2b30; stroke-width: 4.5; stroke-linecap: round; }
+.demo-controles { position: absolute; right: 10px; top: 10px; display: flex; gap: 6px; }
+.demo-btn {
+  height: 30px;
+  min-width: 30px;
+  padding: 0 11px;
+  border: 0;
+  border-radius: 999px;
+  background: rgba(20, 20, 24, 0.62);
+  color: #fff;
+  font-family: inherit;
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+  -webkit-backdrop-filter: blur(6px);
+  backdrop-filter: blur(6px);
 }
-.demo .piel { stroke: var(--piel); }
-.demo .brazo { stroke-width: 7.5; }
-.demo .ante { stroke-width: 6.5; }
-.demo .tibia { stroke-width: 8; }
-.demo .cuello { stroke-width: 6; }
-.demo .short { stroke: var(--short); stroke-width: 10.5; }
-.demo .zapato { stroke: var(--zapato); stroke-width: 5.5; }
-.demo .polera { stroke: var(--naranja); stroke-width: 15; }
-.demo .pelo { fill: var(--pelo); }
-.demo .cara { fill: var(--piel); }
-.demo-lejos { filter: brightness(0.72); }
+.demo-lento[aria-pressed="true"] { background: var(--naranja); }
+.demo-progreso { position: absolute; left: 0; right: 0; bottom: 0; height: 4px; background: rgba(0, 0, 0, 0.12); }
+.demo-progreso div { height: 100%; width: 0; background: var(--naranja); }
+
+/* Fotos reales */
+.fotos-fila { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 10px; }
+.fotos-fila figure { margin: 0; display: flex; flex-direction: column; gap: 4px; }
+.fotos-fila img { width: 100%; aspect-ratio: 3 / 2; object-fit: cover; border-radius: 12px; background: var(--gris); }
+.fotos-fila figcaption { font-size: 13px; color: var(--secundario); text-align: center; }
 
 /* Video del ejercicio */
 .video {
@@ -469,29 +487,6 @@ select {
 .paso .anillo { width: 190px; height: 190px; }
 .paso .anillo-texto { font-size: 56px; }
 .reps strong { font-size: 92px; }
-
-/* Fotos reales del ejercicio */
-.fotos {
-  position: relative;
-  width: 100%;
-  aspect-ratio: 3 / 2;
-  border-radius: 16px;
-  overflow: hidden;
-  background: #1a1a1a;
-  box-shadow: var(--sombra);
-}
-.fotos img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
-.fotos-mov img:nth-child(2) { animation: alternar-foto 2.6s ease-in-out infinite; }
-@keyframes alternar-foto {
-  0%, 38% { opacity: 0; }
-  50%, 88% { opacity: 1; }
-  100% { opacity: 0; }
-}
-@media (prefers-reduced-motion: reduce) {
-  .fotos-mov img:nth-child(2) { animation-duration: 6s; }
-}
-.fotos-paso { max-width: 360px; }
-.fotos-chica { max-width: 200px; }
 
 /* Detalle del ejercicio dentro de la rutina */
 .detalle-cab { display: flex; flex-direction: column; gap: 4px; }

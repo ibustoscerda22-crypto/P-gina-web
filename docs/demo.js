@@ -477,16 +477,20 @@ const FOTOS = {
   bicho_muerto: 2, superman: 2,
 };
 
-// Foto real si existe (alternando inicio y final); si no, la figura animada.
-// tamano: "grande" | "paso" | "chica"
+// El "video" animado de cada ejercicio. tamano: "grande" | "paso" | "chica"
 function htmlMedia(e, tamano) {
+  return htmlDemo(e.id, `demo-${tamano}`);
+}
+
+// Fotos reales (posición inicial y final), si el ejercicio las tiene.
+function htmlFotos(e) {
   const n = FOTOS[e.id];
-  if (!n) return htmlDemo(e.id, `demo-${tamano}`);
+  if (!n) return "";
   const nombre = e.nombre.replace(/"/g, "");
-  const imgs = Array.from({ length: n }, (_, i) =>
-    `<img src="fotos/${e.id}-${i + 1}.jpg" alt="${i === 0 ? "Posición inicial" : "Posición final"}: ${nombre}">`
-  ).join("");
-  return `<div class="fotos fotos-${tamano} ${n > 1 ? "fotos-mov" : ""}">${imgs}</div>`;
+  return `<div class="fotos-fila">${Array.from({ length: n }, (_, i) =>
+    `<figure><img src="fotos/${e.id}-${i + 1}.jpg" alt="${i === 0 ? "Posición inicial" : "Posición final"}: ${nombre}" loading="lazy">
+     <figcaption>${n === 1 ? "Posición" : i === 0 ? "Inicio" : "Final"}</figcaption></figure>`
+  ).join("")}</div>`;
 }
 
 // Video tutorial real (YouTube) de cada ejercicio.
@@ -649,107 +653,219 @@ function poseEnTiempo(demo, ms) {
   return cuadros[0].p;
 }
 
-const NS = "http://www.w3.org/2000/svg";
+// ---------- Dibujo: "video" de estudio ----------
 
-// Parte superior del encuadre: lo justo para que quepa todo el movimiento.
-function techoDemo(demo) {
-  let minY = SUELO;
+const f1 = (n) => n.toFixed(1);
+
+// Encuadre 4:3 que contiene todo el movimiento (como un video).
+function encuadreDemo(demo) {
+  let minX = Infinity, maxX = -Infinity, minY = Infinity;
+  const tomar = ([x, y]) => {
+    minX = Math.min(minX, x);
+    maxX = Math.max(maxX, x);
+    minY = Math.min(minY, y);
+  };
   const cuadros = demo.cuadros;
   cuadros.forEach((c, i) => {
     [c.p, interpolar(c.p, cuadros[(i + 1) % cuadros.length].p, 0.5)].forEach((pose) => {
       const r = resolverPose(pose);
-      const ys = [r.cadera, r.hombro, ...r.brazoN, ...r.brazoF, ...r.piernaN.puntos, ...r.piernaF.puntos].map((q) => q[1]);
-      minY = Math.min(minY, r.cabeza[1] - MEDIDAS.cabeza, ...ys);
+      [r.cadera, r.hombro, ...r.brazoN, ...r.brazoF, ...r.piernaN.puntos, ...r.piernaF.puntos, r.piernaN.pie[1], r.piernaF.pie[1]].forEach(tomar);
+      tomar([r.cabeza[0] - MEDIDAS.cabeza, r.cabeza[1] - MEDIDAS.cabeza]);
+      tomar([r.cabeza[0] + MEDIDAS.cabeza, r.cabeza[1]]);
     });
   });
   (demo.objetos || []).forEach((o) => {
-    if (o.y != null) minY = Math.min(minY, o.y);
+    if (o.tipo === "caja") { tomar([o.x, o.y]); tomar([o.x + o.w, o.y]); }
+    if (o.tipo === "barra") { tomar([o.x1 - 8, o.y - 4]); tomar([o.x2 + 8, o.y]); }
+    if (o.tipo === "pared") tomar([o.x + 14, SUELO]);
   });
-  return Math.min(Math.floor(minY - 14), 90);
+  const margen = 16;
+  let x = minX - margen;
+  let w = maxX - minX + margen * 2;
+  let y = minY - margen;
+  const abajo = SUELO + 14;
+  let h = abajo - y;
+  if (w / h < 4 / 3) {
+    const nuevoW = (h * 4) / 3;
+    x -= (nuevoW - w) / 2;
+    w = nuevoW;
+  } else {
+    const nuevoH = (w * 3) / 4;
+    y = abajo - nuevoH;
+    h = nuevoH;
+  }
+  return { x, y, w, h };
 }
 
-function htmlObjetos(objetos = [], techo = -12) {
-  return objetos
+// Segmento del cuerpo con grosor distinto en cada punta (más parecido a un músculo).
+function trazoCuerpo(a, b, ra, rb) {
+  const dx = b[0] - a[0];
+  const dy = b[1] - a[1];
+  const L = Math.hypot(dx, dy) || 0.001;
+  const nx = -dy / L;
+  const ny = dx / L;
+  const p1 = [a[0] + nx * ra, a[1] + ny * ra];
+  const p2 = [b[0] + nx * rb, b[1] + ny * rb];
+  const p3 = [b[0] - nx * rb, b[1] - ny * rb];
+  const p4 = [a[0] - nx * ra, a[1] - ny * ra];
+  return `M${f1(p1[0])},${f1(p1[1])} L${f1(p2[0])},${f1(p2[1])} A${rb},${rb} 0 0 0 ${f1(p3[0])},${f1(p3[1])} L${f1(p4[0])},${f1(p4[1])} A${ra},${ra} 0 0 0 ${f1(p1[0])},${f1(p1[1])}Z`;
+}
+
+const punto = (a, b, t) => [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t];
+
+function htmlObjetos(objetos, cuadro) {
+  return (objetos || [])
     .map((o) => {
-      if (o.tipo === "pared") return `<rect class="demo-objeto" x="${o.x}" y="${techo}" width="${200 - o.x}" height="${SUELO - techo}"/>`;
-      if (o.tipo === "caja") return `<rect class="demo-objeto" x="${o.x}" y="${o.y}" width="${o.w}" height="${o.h}" rx="2"/>`;
+      if (o.tipo === "pared")
+        return `<rect class="obj-pared" x="${o.x}" y="${f1(cuadro.y)}" width="${f1(cuadro.x + cuadro.w - o.x)}" height="${f1(SUELO - cuadro.y)}"/>`;
+      if (o.tipo === "caja")
+        return `<rect class="obj-caja" x="${o.x}" y="${o.y}" width="${o.w}" height="${o.h}" rx="2.5"/>
+                <rect class="obj-caja-tapa" x="${o.x}" y="${o.y}" width="${o.w}" height="4" rx="2"/>`;
       if (o.tipo === "barra")
         return `
-          <line class="demo-poste" x1="${o.x1}" y1="${o.y}" x2="${o.x1}" y2="${SUELO}"/>
-          <line class="demo-poste" x1="${o.x2}" y1="${o.y}" x2="${o.x2}" y2="${SUELO}"/>
-          <line class="demo-barra" x1="${o.x1 - 6}" y1="${o.y}" x2="${o.x2 + 6}" y2="${o.y}"/>`;
+          <line class="obj-poste" x1="${o.x1}" y1="${o.y}" x2="${o.x1}" y2="${SUELO}"/>
+          <line class="obj-poste" x1="${o.x2}" y1="${o.y}" x2="${o.x2}" y2="${SUELO}"/>
+          <line class="obj-barra" x1="${o.x1 - 6}" y1="${o.y}" x2="${o.x2 + 6}" y2="${o.y}"/>`;
       return "";
     })
     .join("");
 }
 
+let contadorDemos = 0;
+
 function iniciarDemo(el) {
   const demo = DEMOS[el.dataset.demo];
   if (!demo) return;
   el.dataset.activo = "1";
-  const claseLejos = demo.frente ? "demo-cerca" : "demo-lejos";
-  const segmento = (nombre, clase) => `<line data-p="${nombre}" class="${clase}"/>`;
-  const techo = techoDemo(demo);
+  const uid = `d${++contadorDemos}`;
+  const c = encuadreDemo(demo);
+  const conControles = !el.classList.contains("demo-chica");
+  const lado = (sufijo, clase) => `<path data-p="${sufijo}" class="${clase}"/>`;
   el.innerHTML = `
-    <svg viewBox="0 ${techo} 200 ${SUELO + 10 - techo}" role="img" aria-label="Demostración animada">
-      <line class="demo-suelo" x1="0" y1="${SUELO + 4}" x2="200" y2="${SUELO + 4}"/>
-      ${htmlObjetos(demo.objetos, techo)}
-      <g class="${claseLejos}">
-        ${segmento("brazoF1", "piel brazo")}${segmento("brazoF2", "piel ante")}
-        ${segmento("piernaF1", "short")}${segmento("piernaF2", "piel tibia")}${segmento("pieF", "zapato")}
+    <svg viewBox="${f1(c.x)} ${f1(c.y)} ${f1(c.w)} ${f1(c.h)}" role="img" aria-label="Video animado del ejercicio">
+      <defs>
+        <radialGradient id="${uid}-fondo" cx="0.55" cy="0.35" r="0.85">
+          <stop offset="0" stop-color="#f1f1f4"/><stop offset="1" stop-color="#c4c4cc"/>
+        </radialGradient>
+        <linearGradient id="${uid}-suelo" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0" stop-color="#d3d3da"/><stop offset="1" stop-color="#b9b9c2"/>
+        </linearGradient>
+        <radialGradient id="${uid}-sombra">
+          <stop offset="0" stop-color="#000" stop-opacity="0.28"/><stop offset="1" stop-color="#000" stop-opacity="0"/>
+        </radialGradient>
+      </defs>
+      <rect x="${f1(c.x)}" y="${f1(c.y)}" width="${f1(c.w)}" height="${f1(c.h)}" fill="url(#${uid}-fondo)"/>
+      <rect x="${f1(c.x)}" y="${SUELO + 3}" width="${f1(c.w)}" height="${f1(c.y + c.h - SUELO)}" fill="url(#${uid}-suelo)"/>
+      ${htmlObjetos(demo.objetos, c)}
+      <ellipse data-p="sombra" cy="${SUELO + 4}" ry="4" fill="url(#${uid}-sombra)"/>
+      <g class="${demo.frente ? "cuerpo" : "cuerpo lejos"}">
+        ${lado("brazoF", "piel")}${lado("manoF", "piel")}${lado("piernaF", "piel")}${lado("shortF", "short")}${lado("pieF", "zapatilla")}
       </g>
-      <g class="demo-cerca">
-        ${segmento("piernaN1", "short")}${segmento("piernaN2", "piel tibia")}${segmento("pieN", "zapato")}
-        <path data-p="torso" class="polera"/>
-        ${segmento("cuello", "piel cuello")}
-        <circle data-p="pelo" class="pelo" r="${MEDIDAS.cabeza + 0.5}"/>
-        <circle data-p="cara" class="cara" r="${MEDIDAS.cabeza - 1}"/>
-        ${segmento("brazoN1", "piel brazo")}${segmento("brazoN2", "piel ante")}
+      <g class="cuerpo">
+        ${lado("piernaN", "piel")}${lado("shortN", "short")}${lado("pieN", "zapatilla")}
+        ${lado("cuello", "piel")}
+        ${lado("torso", "polera")}${lado("cadera", "short")}
+        <circle data-p="pelo" class="pelo" r="${MEDIDAS.cabeza + 0.6}"/>
+        <circle data-p="cara" class="piel" r="${MEDIDAS.cabeza - 0.6}"/>
+        ${lado("brazoN", "piel")}${lado("mangaN", "polera")}${lado("manoN", "piel")}
       </g>
-    </svg>`;
+    </svg>
+    ${
+      conControles
+        ? `<div class="demo-controles">
+             <button class="demo-btn" data-demo-pausa aria-label="Pausar">❚❚</button>
+             <button class="demo-btn demo-lento" data-demo-lento aria-pressed="false">Lento</button>
+           </div>
+           <div class="demo-progreso"><div></div></div>`
+        : ""
+    }`;
   const partes = {};
   el.querySelectorAll("[data-p]").forEach((n) => (partes[n.dataset.p] = n));
-  const linea = (n, [a, b]) => {
-    n.setAttribute("x1", a[0].toFixed(1));
-    n.setAttribute("y1", a[1].toFixed(1));
-    n.setAttribute("x2", b[0].toFixed(1));
-    n.setAttribute("y2", b[1].toFixed(1));
+  const barra = el.querySelector(".demo-progreso div");
+  const total = demo.cuadros.reduce((s, q) => s + q.h + q.t, 0);
+
+  const pierna = (puntos, pie) => {
+    const [cad, rod, tob] = puntos;
+    const d = trazoCuerpo(cad, rod, 6.6, 4.8) + trazoCuerpo(rod, tob, 4.6, 3.1);
+    const short = trazoCuerpo(cad, punto(cad, rod, 0.55), 7.2, 6);
+    const zapatilla = trazoCuerpo(punto(pie[0], pie[1], -0.15), pie[1], 3.4, 2.6);
+    return { d, short, zapatilla };
+  };
+  const brazo = (puntos) => {
+    const [hom, codo, mano] = puntos;
+    return {
+      d: trazoCuerpo(hom, codo, 4.4, 3.4) + trazoCuerpo(codo, mano, 3.3, 2.5),
+      manga: trazoCuerpo(hom, punto(hom, codo, 0.45), 5, 4.4),
+      mano: trazoCuerpo(punto(codo, mano, 0.98), mano, 3, 3),
+    };
   };
 
   const dibujar = (p) => {
-    const c = resolverPose(p);
-    partes.torso.setAttribute(
-      "d",
-      `M${c.cadera[0].toFixed(1)},${c.cadera[1].toFixed(1)} Q${c.control[0].toFixed(1)},${c.control[1].toFixed(1)} ${c.hombro[0].toFixed(1)},${c.hombro[1].toFixed(1)}`
-    );
-    linea(partes.cuello, [c.hombro, c.cabeza]);
-    // Pelo detrás y arriba de la cabeza; la cara un poco hacia adelante.
+    const r = resolverPose(p);
+    const pn = pierna(r.piernaN.puntos, r.piernaN.pie);
+    const pf = pierna(r.piernaF.puntos, r.piernaF.pie);
+    const bn = brazo(r.brazoN);
+    const bf = brazo(r.brazoF);
+    partes.piernaN.setAttribute("d", pn.d);
+    partes.shortN.setAttribute("d", pn.short);
+    partes.pieN.setAttribute("d", pn.zapatilla);
+    partes.piernaF.setAttribute("d", pf.d);
+    partes.shortF.setAttribute("d", pf.short);
+    partes.pieF.setAttribute("d", pf.zapatilla);
+    partes.brazoN.setAttribute("d", bn.d);
+    partes.mangaN.setAttribute("d", bn.manga);
+    partes.manoN.setAttribute("d", bn.mano);
+    partes.brazoF.setAttribute("d", bf.d);
+    partes.manoF.setAttribute("d", bf.mano);
+    // Torso en dos tramos para seguir la curva de la espalda.
+    const medio = [
+      0.25 * r.cadera[0] + 0.5 * r.control[0] + 0.25 * r.hombro[0],
+      0.25 * r.cadera[1] + 0.5 * r.control[1] + 0.25 * r.hombro[1],
+    ];
+    partes.torso.setAttribute("d", trazoCuerpo(r.cadera, medio, 7.4, 7.8) + trazoCuerpo(medio, r.hombro, 7.8, 8.4));
+    partes.cadera.setAttribute("d", trazoCuerpo(r.cadera, punto(r.cadera, medio, 0.55), 7.8, 7.6));
+    partes.cuello.setAttribute("d", trazoCuerpo(r.hombro, r.cabeza, 3.6, 3.6));
     const giro = p.torso + (p.cabeza || 0);
     const adelante = demo.frente ? 0 : 1.6;
-    const pelo = mover(mover(c.cabeza, giro, 1.8), giro + 90, -adelante);
-    const cara = mover(c.cabeza, giro + 90, adelante);
-    partes.pelo.setAttribute("cx", pelo[0].toFixed(1));
-    partes.pelo.setAttribute("cy", pelo[1].toFixed(1));
-    partes.cara.setAttribute("cx", cara[0].toFixed(1));
-    partes.cara.setAttribute("cy", cara[1].toFixed(1));
-    linea(partes.brazoN1, [c.brazoN[0], c.brazoN[1]]);
-    linea(partes.brazoN2, [c.brazoN[1], c.brazoN[2]]);
-    linea(partes.brazoF1, [c.brazoF[0], c.brazoF[1]]);
-    linea(partes.brazoF2, [c.brazoF[1], c.brazoF[2]]);
-    linea(partes.piernaN1, [c.piernaN.puntos[0], c.piernaN.puntos[1]]);
-    linea(partes.piernaN2, [c.piernaN.puntos[1], c.piernaN.puntos[2]]);
-    linea(partes.piernaF1, [c.piernaF.puntos[0], c.piernaF.puntos[1]]);
-    linea(partes.piernaF2, [c.piernaF.puntos[1], c.piernaF.puntos[2]]);
-    linea(partes.pieN, c.piernaN.pie);
-    linea(partes.pieF, c.piernaF.pie);
+    const pelo = mover(mover(r.cabeza, giro, 1.8), giro + 90, -adelante);
+    const cara = mover(r.cabeza, giro + 90, adelante);
+    partes.pelo.setAttribute("cx", f1(pelo[0]));
+    partes.pelo.setAttribute("cy", f1(pelo[1]));
+    partes.cara.setAttribute("cx", f1(cara[0]));
+    partes.cara.setAttribute("cy", f1(cara[1]));
+    // Sombra en el suelo bajo el cuerpo.
+    const xs = [r.cadera[0], r.hombro[0], r.piernaN.pie[1][0], r.piernaF.pie[1][0]];
+    const minX = Math.min(...xs);
+    const maxX = Math.max(...xs);
+    partes.sombra.setAttribute("cx", f1((minX + maxX) / 2));
+    partes.sombra.setAttribute("rx", f1(Math.max(14, (maxX - minX) / 2 + 10)));
   };
 
-  const inicio = performance.now();
+  let tiempo = 0;
+  let ultimo = performance.now();
+  let pausado = false;
+  let velocidad = 1;
   const cuadro = (ahora) => {
     if (!el.isConnected) return; // la pantalla cambió: se detiene sola
-    dibujar(poseEnTiempo(demo, ahora - inicio));
+    if (!pausado) tiempo += (ahora - ultimo) * velocidad;
+    ultimo = ahora;
+    dibujar(poseEnTiempo(demo, tiempo));
+    if (barra) barra.style.width = `${((tiempo % total) / total) * 100}%`;
     requestAnimationFrame(cuadro);
   };
+  el.addEventListener("click", (ev) => {
+    if (ev.target.closest("[data-demo-lento]")) {
+      velocidad = velocidad === 1 ? 0.4 : 1;
+      ev.target.setAttribute("aria-pressed", String(velocidad !== 1));
+      return;
+    }
+    if (!conControles) return;
+    pausado = !pausado;
+    const b = el.querySelector("[data-demo-pausa]");
+    b.textContent = pausado ? "▶" : "❚❚";
+    b.setAttribute("aria-label", pausado ? "Reproducir" : "Pausar");
+    el.classList.toggle("en-pausa", pausado);
+  });
   dibujar(demo.cuadros[0].p);
   requestAnimationFrame(cuadro);
 }
