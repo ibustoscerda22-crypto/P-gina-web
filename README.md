@@ -46,3 +46,7 @@ Para probar pagos usa las [tarjetas de prueba de MercadoPago Chile](https://www.
 3. En MercadoPago → Tus integraciones → **Webhooks**, registra `https://tudominio.cl/api/webhook`
    con el evento "Pagos" y copia la clave secreta en `MP_WEBHOOK_SECRET`.
 4. Haz una compra real de bajo monto para verificar todo el flujo.
+
+## Otras herramientas en este repositorio
+
+- [`paletizador/`](paletizador/README.md): PalletCell Designer, generador de celdas paletizadoras (robot ABB/FANUC/KUKA, PLC Siemens/Allen-Bradley con PackML, HMI y seguridad). Abre `paletizador/index.html` en el navegador.

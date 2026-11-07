@@ -1,0 +1,182 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>PalletCell Designer</title>
+<link rel="stylesheet" href="css/styles.css">
+</head>
+<body>
+<header class="top">
+  <div class="brand"><span class="logo">▦</span> PalletCell Designer <small>celdas paletizadoras · robot + PLC PackML + HMI</small></div>
+  <div class="actions">
+    <button id="btnSave" class="ghost" title="Guardar configuración como JSON">Guardar config</button>
+    <label class="ghost btnlike" title="Cargar configuración JSON">Cargar config<input id="fileLoad" type="file" accept=".json" hidden></label>
+    <button id="btnZip" class="primary">Descargar paquete (.zip)</button>
+  </div>
+</header>
+
+<main class="wrap">
+  <aside class="form" id="form">
+    <section>
+      <h3>Proyecto</h3>
+      <label>Nombre<input data-k="projectName" type="text"></label>
+    </section>
+
+    <section>
+      <h3>1 · Robot (esclavo)</h3>
+      <label>Marca<select data-k="robotBrand"></select></label>
+      <label>Modelo<select data-k="robotModel"></select></label>
+      <label>Controlador<select data-k="robotCtrl"></select></label>
+      <p class="hint" id="robotInfo"></p>
+    </section>
+
+    <section>
+      <h3>2 · PLC (maestro) y HMI</h3>
+      <label>Marca PLC<select data-k="plcBrand"></select></label>
+      <label>CPU<select data-k="plcModel"></select></label>
+      <label>HMI<select data-k="hmiModel"></select></label>
+      <label>Protocolo PLC↔Robot<select data-k="protocol"><option>PROFINET</option><option>EtherNet/IP</option></select></label>
+    </section>
+
+    <section>
+      <h3>3 · Producto y llegada (infeed)</h3>
+      <div class="g3">
+        <label>Largo mm<input data-k="boxL" type="number" min="50"></label>
+        <label>Ancho mm<input data-k="boxW" type="number" min="50"></label>
+        <label>Alto mm<input data-k="boxH" type="number" min="20"></label>
+      </div>
+      <div class="g2">
+        <label>Peso kg<input data-k="boxWeight" type="number" step="0.1" min="0.1"></label>
+        <label>Cajas/min por infeed<input data-k="rate" type="number" step="0.5" min="0.5"></label>
+      </div>
+      <label>Cómo llega el producto<select data-k="arrival"></select></label>
+      <div class="g2">
+        <label>N° infeeds<select data-k="nInfeed"><option>1</option><option>2</option><option>3</option><option>4</option></select></label>
+        <label>Altura infeed mm<input data-k="infeedH" type="number"></label>
+      </div>
+      <p class="hint">El producto llega con el largo en el sentido del flujo, contra un tope con fotocélula de toma.</p>
+    </section>
+
+    <section>
+      <h3>4 · Palet y mosaico (outfeed)</h3>
+      <label>Tipo de palet<select data-k="palletType"></select></label>
+      <div class="g3">
+        <label>Largo<input data-k="palletL" type="number"></label>
+        <label>Ancho<input data-k="palletW" type="number"></label>
+        <label>Alto<input data-k="palletH" type="number"></label>
+      </div>
+      <div class="g3">
+        <label>Altura máx. pila<input data-k="maxStackH" type="number" title="Incluye el palet"></label>
+        <label>Capas máx (0=auto)<input data-k="maxLayers" type="number" min="0"></label>
+        <label>Masa palet kg<input data-k="palletMass" type="number"></label>
+      </div>
+      <div class="g3">
+        <label>Voladizo mm<input data-k="overhang" type="number" min="0"></label>
+        <label>Separación mm<input data-k="gap" type="number" min="0"></label>
+        <label>Mosaico<select data-k="patternType"><option value="trabado">Trabado (rot. 180°)</option><option value="espejo">Espejo en Y</option><option value="columna">Columna</option></select></label>
+      </div>
+      <label class="chk"><input data-k="slipSheet" type="checkbox"> Lámina separadora entre capas</label>
+      <div class="g2">
+        <label>N° estaciones palet<select data-k="nOutfeed"><option>1</option><option>2</option><option>3</option><option>4</option></select></label>
+        <label>Altura estación mm<input data-k="outfeedH" type="number"></label>
+      </div>
+      <label>Ingreso de palets vacíos<select data-k="palletSupply"></select></label>
+      <label>Salida de palets llenos<select data-k="palletExit"></select></label>
+    </section>
+
+    <section>
+      <h3>5 · Herramienta y montaje</h3>
+      <label>Herramienta<select data-k="gripper"></select></label>
+      <div class="g3">
+        <label>Masa kg<input data-k="gripperMass" type="number"></label>
+        <label>TCP Z mm<input data-k="toolTcpZ" type="number"></label>
+        <label>Pedestal mm<input data-k="pedestalH" type="number" min="0"></label>
+      </div>
+      <div class="g2">
+        <label>Aproximación Z mm<input data-k="approachZ" type="number"></label>
+        <label>Aproximación XY mm<input data-k="approachXY" type="number"></label>
+      </div>
+    </section>
+
+    <section>
+      <h3>6 · Seguridad</h3>
+      <div class="g2">
+        <label>Puertas de acceso<input data-k="doors" type="number" min="1" max="4"></label>
+        <label>Tiempo paro robot ms<input data-k="robotStopTime" type="number"></label>
+      </div>
+      <label class="chk"><input data-k="lightCurtain" type="checkbox"> Cortinas de luz en estaciones de palet</label>
+      <div class="g3">
+        <label>Resolución<select data-k="lcResolution"><option value="14">14 mm</option><option value="30">30 mm</option><option value="40">40 mm</option><option value="500">2 haces</option><option value="400">3 haces</option><option value="300">4 haces</option></select></label>
+        <label>Resp. cortina ms<input data-k="lcResponse" type="number"></label>
+        <label>Resp. PLC-F ms<input data-k="safetyPlcResponse" type="number"></label>
+      </div>
+      <label class="chk"><input data-k="scanner" type="checkbox"> Escáner láser en zonas de cambio de palet</label>
+      <label class="chk"><input data-k="robotSafe" type="checkbox"> Zonas seguras en el robot (SafeMove / DCS / SafeOperation)</label>
+    </section>
+
+    <section>
+      <h3>7 · Red y direcciones</h3>
+      <div class="g3">
+        <label>IP PLC<input data-k="ipPLC" type="text"></label>
+        <label>IP HMI<input data-k="ipHMI" type="text"></label>
+        <label>IP Robot<input data-k="ipRobot" type="text"></label>
+      </div>
+      <div class="g2">
+        <label>Nombre PN PLC<input data-k="pnPLC" type="text"></label>
+        <label>Nombre PN robot<input data-k="pnRobot" type="text"></label>
+      </div>
+      <div class="g2">
+        <label>Byte inicio %I (Siemens)<input data-k="plcInStart" type="number" min="0"></label>
+        <label>Byte inicio %Q (Siemens)<input data-k="plcOutStart" type="number" min="0"></label>
+      </div>
+      <div class="g3">
+        <label>KUKA offset $IN/$OUT<input data-k="kukaIOOffset" type="number" min="1"></label>
+        <label>KUKA $OUT pinza<input data-k="kukaToolOut" type="number" min="1"></label>
+        <label>KUKA $IN pinza<input data-k="kukaToolIn" type="number" min="1"></label>
+      </div>
+    </section>
+    <button id="btnReset" class="ghost full">Restaurar valores por defecto</button>
+  </aside>
+
+  <section class="out">
+    <nav class="tabs" id="tabs">
+      <button data-t="sum" class="on">Resumen</button>
+      <button data-t="lay">Layout</button>
+      <button data-t="pat">Mosaico</button>
+      <button data-t="wob">Workobjects</button>
+      <button data-t="com">Comunicación</button>
+      <button data-t="rob">Robot</button>
+      <button data-t="plc">PLC PackML</button>
+      <button data-t="hmi">HMI</button>
+      <button data-t="saf">Seguridad</button>
+      <button data-t="doc">Archivos</button>
+    </nav>
+    <div class="panel on" id="t-sum"></div>
+    <div class="panel" id="t-lay"></div>
+    <div class="panel" id="t-pat"></div>
+    <div class="panel" id="t-wob"></div>
+    <div class="panel" id="t-com"></div>
+    <div class="panel" id="t-rob"></div>
+    <div class="panel" id="t-plc"></div>
+    <div class="panel" id="t-hmi"></div>
+    <div class="panel" id="t-saf"></div>
+    <div class="panel" id="t-doc"></div>
+  </section>
+</main>
+
+<footer class="foot">Herramienta de pre-ingeniería. El código y los valores generados son un punto de partida:
+  verifica fichas técnicas, simula y valida la seguridad antes de poner en marcha.</footer>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+<script src="js/data.js"></script>
+<script src="js/calc.js"></script>
+<script src="js/interface.js"></script>
+<script src="js/gen-robot.js"></script>
+<script src="js/gen-plc.js"></script>
+<script src="js/gen-hmi.js"></script>
+<script src="js/gen-safety.js"></script>
+<script src="js/gen-docs.js"></script>
+<script src="js/app.js"></script>
+</body>
+</html>
