@@ -1,0 +1,188 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>OBD Diagnóstico</title>
+  <meta name="description" content="Diagnóstico del vehículo por OBD-II con un adaptador ELM327: códigos de falla, datos en vivo e informe.">
+  <meta name="theme-color" content="#0f1216">
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="icon" href="icon.svg" type="image/svg+xml">
+  <link rel="apple-touch-icon" href="icon.svg">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand">
+      <img src="icon.svg" alt="" width="32" height="32">
+      <div>
+        <h1>OBD Diagnóstico</h1>
+        <input id="vehicle" class="vehicle" aria-label="Vehículo" value="Chevrolet Onix Activ 2018">
+      </div>
+    </div>
+    <div class="conn">
+      <span id="status" class="pill off">Desconectado</span>
+      <button id="btn-disconnect" class="btn small ghost" hidden>Desconectar</button>
+    </div>
+  </header>
+
+  <main>
+    <!-- Conexión -->
+    <section id="connect" class="card">
+      <h2>Conecta el adaptador OBD-II</h2>
+      <ol class="steps">
+        <li>Enchufa el adaptador ELM327 en el puerto OBD-II (bajo el tablero, lado del conductor).</li>
+        <li>Pon la llave en contacto o enciende el motor.</li>
+        <li>Elige cómo conectarte:</li>
+      </ol>
+      <div class="connect-grid">
+        <button id="btn-ble" class="btn primary big">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 7l10 10-5 5V2l5 5L7 17"/></svg>
+          Bluetooth
+          <small>Adaptador BLE (Android / PC)</small>
+        </button>
+        <div class="serial-box">
+          <button id="btn-serial" class="btn big">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2v14M8 6l4-4 4 4M6 12h12v4a6 6 0 0 1-12 0z"/></svg>
+            USB / Serie
+            <small>Cable USB o Bluetooth emparejado en PC</small>
+          </button>
+          <label class="baud">Velocidad
+            <select id="baud">
+              <option>38400</option>
+              <option>9600</option>
+              <option>115200</option>
+              <option>230400</option>
+              <option>500000</option>
+            </select>
+          </label>
+        </div>
+        <button id="btn-demo" class="btn big ghost">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5v14l11-7z"/></svg>
+          Modo demo
+          <small>Probar sin auto</small>
+        </button>
+      </div>
+      <p id="compat" class="muted small"></p>
+      <p id="connect-msg" class="msg" role="status" hidden></p>
+    </section>
+
+    <!-- App conectada -->
+    <div id="app" hidden>
+      <nav class="tabs" role="tablist">
+        <button role="tab" data-tab="diag" aria-selected="true">Diagnóstico</button>
+        <button role="tab" data-tab="live" aria-selected="false">En vivo</button>
+        <button role="tab" data-tab="term" aria-selected="false">Terminal</button>
+        <button role="tab" data-tab="help" aria-selected="false">Ayuda</button>
+      </nav>
+
+      <!-- Diagnóstico -->
+      <section data-panel="diag">
+        <div class="card scan-card">
+          <button id="btn-scan" class="btn primary big wide">Escanear vehículo</button>
+          <div id="scan-progress" class="progress" hidden><div></div><span></span></div>
+        </div>
+
+        <div id="scan-result" hidden>
+          <div class="card summary">
+            <div class="score" id="score"><span></span><small>salud</small></div>
+            <dl class="facts">
+              <div><dt>Check engine</dt><dd id="r-mil"></dd></div>
+              <div><dt>VIN</dt><dd id="r-vin"></dd></div>
+              <div><dt>Protocolo</dt><dd id="r-proto"></dd></div>
+              <div><dt>Fecha</dt><dd id="r-date"></dd></div>
+            </dl>
+          </div>
+
+          <div class="card">
+            <h2>Hallazgos</h2>
+            <ul id="findings" class="findings"></ul>
+          </div>
+
+          <div class="card">
+            <div class="row-between">
+              <h2>Códigos de falla</h2>
+              <button id="btn-clear" class="btn small danger">Borrar códigos</button>
+            </div>
+            <div id="dtc-list"></div>
+          </div>
+
+          <div class="card">
+            <h2>Monitores de emisiones</h2>
+            <ul id="monitors" class="monitors"></ul>
+          </div>
+
+          <div class="card">
+            <h2>Parámetros medidos</h2>
+            <table class="params" id="scan-params"></table>
+          </div>
+
+          <div class="actions">
+            <button id="btn-download" class="btn">Descargar informe</button>
+            <button id="btn-share" class="btn" hidden>Compartir</button>
+          </div>
+        </div>
+
+        <div class="card">
+          <h2>Escaneos anteriores</h2>
+          <ul id="history" class="history"><li class="muted">Aún no hay escaneos guardados en este dispositivo.</li></ul>
+        </div>
+      </section>
+
+      <!-- En vivo -->
+      <section data-panel="live" hidden>
+        <div class="card row-between">
+          <p class="muted small">No uses el celular mientras manejas. Pide a un acompañante que lo mire.</p>
+          <button id="btn-live" class="btn primary">Iniciar</button>
+        </div>
+        <div id="gauges" class="gauges"></div>
+        <div class="card">
+          <h2>Alertas</h2>
+          <ul id="live-findings" class="findings"><li class="muted">Inicia la lectura para ver alertas.</li></ul>
+        </div>
+        <div class="card">
+          <h2>Todos los sensores</h2>
+          <table class="params" id="live-params"></table>
+        </div>
+      </section>
+
+      <!-- Terminal -->
+      <section data-panel="term" hidden>
+        <div class="card">
+          <p class="muted small">Envía comandos directos al ELM327 (por ejemplo <code>ATRV</code>, <code>010C</code>, <code>03</code>).</p>
+          <form id="term-form" class="term-form">
+            <input id="term-input" autocomplete="off" autocapitalize="characters" spellcheck="false" placeholder="Comando" aria-label="Comando">
+            <button class="btn primary">Enviar</button>
+          </form>
+          <pre id="term-log" class="term-log" aria-live="polite"></pre>
+        </div>
+      </section>
+
+      <!-- Ayuda -->
+      <section data-panel="help" hidden>
+        <div class="card prose">
+          <h2>Cómo leer los resultados</h2>
+          <p><b>Códigos almacenados:</b> fallas confirmadas; son las que encienden la luz de check engine.</p>
+          <p><b>Pendientes:</b> la computadora detectó algo una vez. Si se repite, pasará a almacenado.</p>
+          <p><b>Permanentes:</b> no se pueden borrar con el escáner; desaparecen solos cuando la ECU confirma que la falla se reparó.</p>
+          <p><b>Corrección de combustible (STFT/LTFT):</b> cuánto combustible agrega (+) o quita (−) la ECU. Sumadas, lo sano es entre −10 % y +10 %.</p>
+          <p><b>Batería:</b> motor apagado 12,4–12,8 V; motor encendido 13,5–14,7 V.</p>
+          <p><b>Temperatura del motor:</b> lo normal en marcha es 85–100 °C.</p>
+          <h2>Borrar códigos</h2>
+          <p>Borrar los códigos apaga la luz pero <b>no repara la falla</b>. También reinicia los monitores de emisiones, así que no lo hagas justo antes de la revisión técnica.</p>
+          <h2>Adaptadores compatibles</h2>
+          <ul>
+            <li><b>Android (Chrome):</b> adaptadores Bluetooth LE / 4.0 (Vgate iCar Pro BLE, Veepeak OBDCheck BLE, vLinker, OBDLink CX).</li>
+            <li><b>PC con Chrome o Edge:</b> además, adaptadores USB y Bluetooth clásicos emparejados (aparecen como puerto COM; usa “USB / Serie”).</li>
+            <li><b>iPhone:</b> Safari no permite Bluetooth; usa el navegador <i>Bluefy</i> con un adaptador BLE.</li>
+            <li>Los adaptadores <b>Wi-Fi</b> no funcionan desde un navegador.</li>
+          </ul>
+          <p class="muted small">Este informe es orientativo. Ante fallas de frenos, dirección, temperatura o presión de aceite, consulta a un mecánico.</p>
+        </div>
+      </section>
+    </div>
+  </main>
+
+  <script type="module" src="js/app.js"></script>
+</body>
+</html>

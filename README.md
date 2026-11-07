@@ -46,3 +46,7 @@ Para probar pagos usa las [tarjetas de prueba de MercadoPago Chile](https://www.
 3. En MercadoPago → Tus integraciones → **Webhooks**, registra `https://tudominio.cl/api/webhook`
    con el evento "Pagos" y copia la clave secreta en `MP_WEBHOOK_SECRET`.
 4. Haz una compra real de bajo monto para verificar todo el flujo.
+
+## Otras apps en este repositorio
+
+- [`obd-diagnostico/`](obd-diagnostico/): app web para diagnosticar el auto por OBD-II con un adaptador ELM327.
