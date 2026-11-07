@@ -1,0 +1,48 @@
+# Especificación de ejemplo: describe QUÉ se controla; el generador dibuja el CÓMO.
+proyecto:
+  titulo: Planta de ejemplo
+  autor: Ingeniería
+  planta: Planta 1
+  ubicacion: Tablero TG-01
+  revision: A
+
+alimentacion:
+  tension: 3x380/220 V 50 Hz
+  tension_mando: 220 VAC
+  interruptor_general: Interruptor general 4P 63 A
+
+parada_emergencia: true
+
+cargas:
+  - tipo: motor
+    tag: M1
+    descripcion: Cinta transportadora
+    potencia: 2,2 kW
+    arranque: directo          # directo | inversor | estrella_triangulo
+    proteccion: guardamotor    # guardamotor | disyuntor_termico
+    ajuste: 4-6,3 A
+    mando: pulsadores          # pulsadores | selector
+    piloto_marcha: true
+    piloto_falla: true
+
+  - tipo: motor
+    tag: M2
+    descripcion: Portón
+    potencia: 1,5 kW
+    arranque: inversor
+    proteccion: disyuntor_termico
+
+  - tipo: motor
+    tag: M3
+    descripcion: Bomba principal
+    potencia: 15 kW
+    arranque: estrella_triangulo
+    proteccion: disyuntor_termico
+
+  - tipo: electrovalvula
+    descripcion: Válvula de llenado
+    mando: selector
+
+  - tipo: baliza
+    descripcion: Baliza de alarma
+    mando: selector
