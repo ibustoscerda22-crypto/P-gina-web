@@ -1,0 +1,52 @@
+Fotos propias (opcional)
+========================
+
+Si guardas una foto .jpg en esta carpeta con el nombre exacto de abajo, la app la muestra en lugar de la ilustración.
+Usa fotos propias o con licencia de uso (por ejemplo, las que entrega el fabricante para tu proyecto).
+
+ROBOTS
+  irb-460.jpg                     ABB IRB 460
+  irb-660-180-3-15.jpg            ABB IRB 660-180/3.15
+  irb-660-250-3-15.jpg            ABB IRB 660-250/3.15
+  irb-760-450-3-18.jpg            ABB IRB 760-450/3.18
+  irb-4600-60-2-05.jpg            ABB IRB 4600-60/2.05
+  irb-6700-150-3-20.jpg           ABB IRB 6700-150/3.20
+  m-410ic-110.jpg                 FANUC M-410iC/110
+  m-410ic-185.jpg                 FANUC M-410iC/185
+  m-410ic-315.jpg                 FANUC M-410iC/315
+  m-410ic-500.jpg                 FANUC M-410iC/500
+  m-410ib-700.jpg                 FANUC M-410iB/700
+  r-2000ic-210f.jpg               FANUC R-2000iC/210F
+  kr-40-pa.jpg                    KUKA KR 40 PA
+  kr-180-r3200-pa.jpg             KUKA KR 180 R3200 PA
+  kr-240-r3200-pa.jpg             KUKA KR 240 R3200 PA
+  kr-470-2-pa.jpg                 KUKA KR 470-2 PA
+  kr-700-pa.jpg                   KUKA KR 700 PA
+  kr-210-r2700-2.jpg              KUKA KR 210 R2700-2
+
+PLC
+  s7-1500-cpu-1515-2-pn.jpg                     Siemens S7-1500 CPU 1515-2 PN
+  s7-1500f-cpu-1516f-3-pn-dp.jpg                Siemens S7-1500F CPU 1516F-3 PN/DP
+  s7-1500f-cpu-1515f-2-pn.jpg                   Siemens S7-1500F CPU 1515F-2 PN
+  s7-1200-g2-cpu-1214fc.jpg                     Siemens S7-1200 G2 CPU 1214FC
+  et-200sp-cpu-1512sp-f-1-pn.jpg                Siemens ET 200SP CPU 1512SP F-1 PN
+  controllogix-5580-1756-l83e.jpg               Allen-Bradley ControlLogix 5580 (1756-L83E)
+  guardlogix-5580-1756-l83es.jpg                Allen-Bradley GuardLogix 5580 (1756-L83ES)
+  compactlogix-5380-5069-l330er.jpg             Allen-Bradley CompactLogix 5380 (5069-L330ER)
+  compact-guardlogix-5380-5069-l330ers2.jpg     Allen-Bradley Compact GuardLogix 5380 (5069-L330ERS2)
+  compactlogix-5480-5069-l46ermw.jpg            Allen-Bradley CompactLogix 5480 (5069-L46ERMW)
+
+HMI
+  wincc-unified-mtp1200-12.jpg          Siemens WinCC Unified MTP1200 (12")
+  wincc-unified-mtp1500-15.jpg          Siemens WinCC Unified MTP1500 (15")
+  tp1200-comfort-12.jpg                 Siemens TP1200 Comfort (12")
+  ktp700-basic-7.jpg                    Siemens KTP700 Basic (7")
+  panelview-5510-12.jpg                 Allen-Bradley PanelView 5510 (12")
+  panelview-plus-7-perf-12.jpg          Allen-Bradley PanelView Plus 7 Perf. (12")
+  factorytalk-optix-panel-15.jpg        Allen-Bradley FactoryTalk Optix Panel (15")
+  panelview-5310-7.jpg                  Allen-Bradley PanelView 5310 (7")
+
+HERRAMIENTAS
+  herramienta-vacio.jpg           Vacío (ventosas / espuma)
+  herramienta-pinza.jpg           Pinza de garras (clamp)
+  herramienta-horquilla.jpg       Horquilla / dedos (fork)

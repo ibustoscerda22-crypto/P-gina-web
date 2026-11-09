@@ -29,6 +29,7 @@
       <label>Modelo<select data-k="robotModel"></select></label>
       <label>Controlador<select data-k="robotCtrl"></select></label>
       <p class="hint" id="robotInfo"></p>
+      <div class="thumb" id="thRobot"></div>
     </section>
 
     <section>
@@ -36,6 +37,7 @@
       <label>Marca PLC<select data-k="plcBrand"></select></label>
       <label>CPU<select data-k="plcModel"></select></label>
       <label>HMI<select data-k="hmiModel"></select></label>
+      <div class="thumb two" id="thPlc"></div>
       <label>Protocolo PLC↔Robot<select data-k="protocol"><option>PROFINET</option><option>EtherNet/IP</option></select></label>
     </section>
 
@@ -88,6 +90,7 @@
     <section>
       <h3>5 · Herramienta y montaje</h3>
       <label>Herramienta<select data-k="gripper"></select></label>
+      <div class="thumb" id="thGrip"></div>
       <div class="g3">
         <label>Masa kg<input data-k="gripperMass" type="number"></label>
         <label>TCP Z mm<input data-k="toolTcpZ" type="number"></label>
@@ -142,7 +145,8 @@
 
   <section class="out">
     <nav class="tabs" id="tabs">
-      <button data-t="sum" class="on">Resumen</button>
+      <button data-t="gui" class="on">Guía visual</button>
+      <button data-t="sum">Resumen</button>
       <button data-t="lay">Layout</button>
       <button data-t="pat">Mosaico</button>
       <button data-t="wob">Workobjects</button>
@@ -153,7 +157,8 @@
       <button data-t="saf">Seguridad</button>
       <button data-t="doc">Archivos</button>
     </nav>
-    <div class="panel on" id="t-sum"></div>
+    <div class="panel on" id="t-gui"></div>
+    <div class="panel" id="t-sum"></div>
     <div class="panel" id="t-lay"></div>
     <div class="panel" id="t-pat"></div>
     <div class="panel" id="t-wob"></div>
@@ -171,6 +176,7 @@
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
 <script src="js/data.js"></script>
+<script src="js/illustrations.js"></script>
 <script src="js/calc.js"></script>
 <script src="js/interface.js"></script>
 <script src="js/gen-robot.js"></script>

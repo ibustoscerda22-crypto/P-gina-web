@@ -70,7 +70,9 @@
   function onChange(e) {
     const el = e.target, k = el.dataset.k;
     if (!k) return;
-    let v = el.type === "checkbox" ? el.checked : el.value;
+    applyChange(k, el.type === "checkbox" ? el.checked : el.value);
+  }
+  function applyChange(k, v) {
     if (NUM.has(k)) v = Number(v) || 0;
     const prev = cfg[k];
     cfg[k] = v;
@@ -82,7 +84,7 @@
     }
     if (k === "palletType" && v !== "Personalizado") { const p = PAL.PALLETS[v]; cfg.palletL = p.L; cfg.palletW = p.W; cfg.palletH = p.H; }
     if (k === "gripper") cfg.gripperMass = PAL.GRIPPERS[v].mass;
-    if (["robotBrand", "plcBrand", "palletType", "gripper", "robotModel", "robotCtrl"].includes(k) || prev === undefined) writeForm();
+    if (["robotBrand", "plcBrand", "palletType", "gripper", "robotModel", "robotCtrl", "plcModel", "hmiModel"].includes(k) || prev === undefined) writeForm();
     save();
     schedule();
   }
@@ -585,9 +587,160 @@
       <h4>Guía de implementación</h4><pre class="src" id="docView">${esc(FILES["docs/guia_implementacion.txt"])}</pre>`;
   }
 
+  /* ---------------- Guía visual (didáctica) ---------------- */
+  const HELP = {
+    sum: "Resumen de la celda: verifica si el robot soporta la carga, si alcanza la velocidad pedida y si llega a todas las estaciones. Rojo = no cumple, amarillo = revisar, verde = OK.",
+    lay: "Vista superior a escala (milímetros). El círculo naranjo es el alcance del robot. Las flechas roja (X) y verde (Y) muestran el origen de cada frame de usuario (workobject).",
+    pat: "Cómo se acomodan las cajas en cada capa. Las capas pares e impares se alternan para que la carga quede trabada y no se desarme. El número indica el orden en que el robot deja cada toma.",
+    wob: "Un workobject (ABB), user frame (FANUC) o base (KUKA) es un sistema de coordenadas pegado a la estación. Si lo calibras bien, todas las posiciones del mosaico quedan correctas sin enseñar punto por punto.",
+    com: "Las señales que el PLC y el robot intercambian por la red cada pocos milisegundos: bits de control (marcha, permisos, confirmaciones) y palabras con números (posiciones, códigos).",
+    rob: "Programa del robot listo para cargar en su controlador. El robot sólo espera comandos del PLC, los ejecuta y responde.",
+    plc: "Programa del PLC con la máquina de estados PackML. Prueba los botones del simulador para ver cómo cambia de estado la celda.",
+    hmi: "La pantalla del operador. La maqueta es navegable y está conectada al simulador PackML.",
+    saf: "Concepto de seguridad para proteger a las personas: cerco, puertas con bloqueo, cortinas de luz y zonas seguras del robot.",
+    doc: "Todos los archivos generados. Descárgalos en .zip y sigue la guía de implementación paso a paso."
+  };
+
+  const GLOSSARY = [
+    ["Paletizado", "Acomodar productos (cajas, sacos) sobre un palet en capas, siguiendo un patrón (mosaico), para almacenarlos o despacharlos."],
+    ["Infeed / Outfeed", "Infeed: transportador que trae el producto hasta el robot. Outfeed: estación o transportador donde está el palet que se llena y por donde sale cuando está completo."],
+    ["PLC (maestro)", "Controlador programable que coordina toda la celda: lee sensores, mueve transportadores, decide qué hace el robot y vigila las fallas."],
+    ["Robot (esclavo)", "Ejecuta los movimientos que le ordena el PLC: tomar en un infeed y dejar en una posición del palet. No decide la secuencia."],
+    ["HMI", "Human-Machine Interface: la pantalla táctil desde la que el operador arranca, detiene, ve alarmas y cambia recetas."],
+    ["PackML", "Estándar de la industria del envasado (ISA-TR88.00.02) que define los mismos 17 estados para todas las máquinas: Stopped, Idle, Execute, Held, Suspended, Aborted, etc. Facilita integrar líneas completas."],
+    ["Handshake", "Diálogo de confirmación: el PLC envía un comando (CmdValid), el robot confirma que lo recibió (CmdAck) y luego avisa que lo terminó (CmdDone). Evita comandos perdidos o duplicados."],
+    ["Bit de vida", "Una señal que el PLC cambia cada 500 ms y el robot devuelve invertida. Si deja de cambiar, la comunicación se cortó y la celda se detiene."],
+    ["TCP", "Tool Center Point: el punto de la herramienta que el robot lleva a cada posición (por ejemplo, el centro de la cara de las ventosas)."],
+    ["Workobject / User frame / Base", "Sistema de coordenadas propio de una estación (por ejemplo, la esquina del palet). Se calibra enseñando 3 puntos con el robot."],
+    ["Mosaico", "El patrón en que se acomodan las cajas en una capa. Columna (todas iguales), trabado (capas giradas), molinete (pinwheel) o espejo."],
+    ["Lámina separadora", "Hoja de cartón que se pone entre capas para estabilizar la carga cuando el mosaico no traba bien."],
+    ["PROFINET / EtherNet/IP", "Redes industriales sobre Ethernet. PROFINET es la nativa de Siemens; EtherNet/IP la de Allen-Bradley (Rockwell)."],
+    ["PROFIsafe / CIP Safety", "Versiones de seguridad de esas redes: transportan señales de emergencia y paro de forma certificada."],
+    ["PL d / Categoría 3", "Nivel de confiabilidad que exige la norma ISO 13849-1 a las funciones de seguridad típicas de una celda robotizada (redundancia de 2 canales con diagnóstico)."],
+    ["Cortina de luz / muting", "Barrera de haces infrarrojos que detiene el robot si una persona la cruza. El muting la anula sólo mientras pasa un palet, reconocido por sensores."]
+  ];
+
+  const WHAT = {
+    robot: "Toma el producto del infeed y lo deja en la posición exacta del palet. Los paletizadores de 4 ejes son más rápidos porque la herramienta siempre queda horizontal; los de 6 ejes permiten inclinar la herramienta.",
+    plc: "Es el cerebro de la celda: ejecuta PackML, decide la próxima toma, envía la posición al robot, mueve transportadores y vigila sensores y fallas.",
+    hmi: "Pantalla táctil del operador: estado PackML, botones Start/Stop/Reset, alarmas, recetas y producción.",
+    gripper: "Herramienta del robot (EOAT) que sujeta el producto. Se elige según el empaque: ventosas para cajas cerradas, pinza para cajas abiertas, horquilla para sacos."
+  };
+
+  function guideCards() {
+    const { cfg, robot, checks, pat } = ctx;
+    const plcD = PAL.PLCS[cfg.plcBrand].models[cfg.plcModel], hmiD = PAL.HMIS[cfg.plcBrand][cfg.hmiModel];
+    const card = (title, img, name, specs, what, status) => `<div class="gcard sel"><div class="gimg">${img}</div>
+      <div class="gbody"><div class="gkind">${title}</div><b>${esc(name)}</b>
+      <ul class="specs">${specs.map((s) => `<li>${s}</li>`).join("")}</ul>
+      <p class="what">${esc(what)}</p>${status ? `<div class="chip ${status[0]}">${esc(status[1])}</div>` : ""}</div></div>`;
+    return `<div class="gcards">
+      ${card("Robot · esclavo", PAL.art.img("robot", cfg.robotBrand, cfg.robotModel, robot), `${cfg.robotBrand} ${cfg.robotModel}`,
+        [`${robot.axes} ejes`, `Carga máx. ${robot.payload} kg`, `Alcance ${robot.reach} mm`, `~${robot.cph} ciclos/h`, `Controlador ${esc(cfg.robotCtrl)}`],
+        WHAT.robot, checks.loadPct > 100 ? ["bad", `No soporta la carga (${checks.load} kg)`] : ["ok", `Carga ${checks.loadPct}% · ciclo ${checks.cyclePct}%`])}
+      ${card("PLC · maestro", PAL.art.img("plc", cfg.plcBrand, cfg.plcModel, plcD), `${cfg.plcBrand} ${cfg.plcModel}`,
+        [esc(PAL.PLCS[cfg.plcBrand].software), esc(PAL.PLCS[cfg.plcBrand].lang), `Red ${esc(cfg.protocol)}`, plcD.safety ? `Seguridad integrada (${PAL.PLCS[cfg.plcBrand].safeBus})` : "Sin seguridad integrada"],
+        WHAT.plc, plcD.safety ? ["ok", "CPU de seguridad"] : ["warn", "Requiere relé/PLC de seguridad"])}
+      ${card("HMI · operador", PAL.art.img("hmi", cfg.plcBrand, cfg.hmiModel, hmiD), cfg.hmiModel, [esc(hmiD.sw), `Resolución ${hmiD.res}`, `IP ${esc(cfg.ipHMI)}`], WHAT.hmi)}
+      ${card("Herramienta", PAL.art.img("gripper", "", cfg.gripper), PAL.GRIPPERS[cfg.gripper].name,
+        [`Masa ${checks.gripMass} kg`, `${pat.nPick} caja(s) por toma`, esc(PAL.GRIPPERS[cfg.gripper].note)], WHAT.gripper)}
+    </div>`;
+  }
+
+  function guideArch() {
+    const { cfg } = ctx;
+    const plcD = PAL.PLCS[cfg.plcBrand].models[cfg.plcModel];
+    const box = (cls, img, title, sub) => `<div class="anode ${cls}">${img ? `<div class="aimg">${img}</div>` : ""}<b>${title}</b><small>${sub}</small></div>`;
+    return `<div class="arch">
+      <div class="a-hmi">${box("", PAL.art.img("hmi", cfg.plcBrand, cfg.hmiModel, {}, "art sm"), "HMI", "El operador da órdenes y ve el estado")}</div>
+      <div class="a-l1"><span>⇅ Ethernet · tags de la HMI</span></div>
+      <div class="a-plc">${box("master", PAL.art.img("plc", cfg.plcBrand, cfg.plcModel, plcD, "art sm"), "PLC · MAESTRO", "Decide qué hacer y cuándo")}</div>
+      <div class="a-link"><span>${esc(cfg.protocol)}<br>64 bytes ⇄ 64 bytes<br>cada ~10 ms</span><i>⟷</i></div>
+      <div class="a-rob">${box("slave", PAL.art.img("robot", cfg.robotBrand, cfg.robotModel, ctx.robot, "art sm"), "ROBOT · ESCLAVO", "Ejecuta el movimiento ordenado")}</div>
+      <div class="a-l2"><span>⇅ E/S cableadas</span></div>
+      <div class="a-l3"><span>⇅ ${esc(ctx.robotCat.safeBus[cfg.protocol])}</span></div>
+      <div class="a-io">${box("", "", "Sensores y transportadores", `${cfg.nInfeed} infeed(s) · ${cfg.nOutfeed} estación(es) de palet · fotocélulas`)}</div>
+      <div class="a-saf">${box("safe", "", "Seguridad", `Emergencias, puertas, ${cfg.lightCurtain ? "cortinas" : "escáner"} · PL d`)}</div>
+    </div>`;
+  }
+
+  function guideCycle() {
+    const { cfg, pat } = ctx;
+    const steps = [
+      ["📦", "Llega el producto", `El infeed avanza hasta que la fotocélula del tope detecta ${pat.nPick === 2 ? "2 cajas" : "la caja"}. El PLC lo marca como listo.`],
+      ["🧠", "El PLC decide", "Elige el infeed con producto y el palet que se está llenando, busca la siguiente posición del mosaico (X, Y, Z, giro)."],
+      ["📨", "Envía el comando", "Escribe los datos y activa CmdValid. El robot responde CmdAck con el mismo número de comando."],
+      ["🤖", "El robot toma", `Pide permiso de zona, baja sobre el producto, activa ${PAL.GRIPPERS[cfg.gripper].name.toLowerCase()} y verifica que lo tiene.`],
+      ["🎯", "Deja en el palet", "Se acerca en diagonal para no rozar cajas ya puestas, baja, suelta y sube."],
+      ["✅", "Avisa que terminó", "Activa CmdDone. El PLC suma la caja, avanza el contador y repite el ciclo."],
+      [cfg.slipSheet ? "📄" : "🔁", cfg.slipSheet ? "Lámina por capa" : "Capa completa", cfg.slipSheet ? "Al empezar cada capa el PLC ordena primero poner una lámina separadora." : "Al completar una capa el PLC alterna al mosaico de la capa siguiente (A/B)."],
+      ["🚚", "Palet completo", cfg.palletExit === "conveyor" ? "El PLC enciende el transportador de salida cuando el robot está fuera de la zona." : "Se enciende la baliza; el operador lo retira con grúa horquilla mientras el robot trabaja en otra estación."]
+    ];
+    return `<div class="cycle">${steps.map((s, i) => `<div class="step"><div class="num">${i + 1}</div><div class="ico">${s[0]}</div><b>${s[1]}</b><p>${esc(s[2])}</p></div>`).join("")}</div>`;
+  }
+
+  function guideGalleries() {
+    const { cfg } = ctx;
+    const need = ctx.checks.gripMass + cfg.boxWeight * ctx.pat.nPick;
+    const minReach = Math.hypot(cfg.palletL / 2, cfg.palletW + 700) + 400;
+    const rb = PAL.ROBOTS[cfg.robotBrand];
+    const brands = Object.keys(PAL.ROBOTS).map((b) => `<button class="pill ${b === cfg.robotBrand ? "on" : ""}" data-pick="robotBrand" data-val="${b}">${b}</button>`).join("");
+    const robots = Object.entries(rb.models).map(([m, d]) => {
+      const okL = d.payload >= need * 1.1, okR = d.reach >= minReach, sel = m === cfg.robotModel;
+      return `<div class="gcard pick ${sel ? "sel" : ""}" data-pick="robotModel" data-val="${esc(m)}" tabindex="0">
+        <div class="gimg">${PAL.art.img("robot", cfg.robotBrand, m, d)}</div>
+        <div class="gbody"><b>${esc(m)}</b><small>${d.axes} ejes · ${d.payload} kg · ${d.reach} mm · ~${d.cph} c/h</small>
+        <div class="chips"><span class="chip ${okL ? "ok" : "bad"}">${okL ? "Carga OK" : "Carga insuficiente"}</span><span class="chip ${okR ? "ok" : "warn"}">${okR ? "Alcance OK" : "Alcance justo"}</span>${sel ? '<span class="chip blu">Seleccionado</span>' : ""}</div></div></div>`;
+    }).join("");
+    const pbrands = Object.keys(PAL.PLCS).map((b) => `<button class="pill ${b === cfg.plcBrand ? "on" : ""}" data-pick="plcBrand" data-val="${b}">${b}</button>`).join("");
+    const plcs = Object.entries(PAL.PLCS[cfg.plcBrand].models).map(([m, d]) => `<div class="gcard pick ${m === cfg.plcModel ? "sel" : ""}" data-pick="plcModel" data-val="${esc(m)}" tabindex="0">
+        <div class="gimg">${PAL.art.img("plc", cfg.plcBrand, m, d)}</div><div class="gbody"><b>${esc(m)}</b><small>${esc(PAL.PLCS[cfg.plcBrand].software)}</small>
+        <div class="chips">${d.safety ? '<span class="chip ok">Seguridad integrada</span>' : '<span class="chip warn">Estándar</span>'}${m === cfg.plcModel ? '<span class="chip blu">Seleccionado</span>' : ""}</div></div></div>`).join("");
+    const hmis = Object.entries(PAL.HMIS[cfg.plcBrand]).map(([m, d]) => `<div class="gcard pick ${m === cfg.hmiModel ? "sel" : ""}" data-pick="hmiModel" data-val="${esc(m)}" tabindex="0">
+        <div class="gimg">${PAL.art.img("hmi", cfg.plcBrand, m, d)}</div><div class="gbody"><b>${esc(m)}</b><small>${esc(d.sw)} · ${d.res}</small>
+        <div class="chips">${m === cfg.hmiModel ? '<span class="chip blu">Seleccionado</span>' : ""}</div></div></div>`).join("");
+    const grips = Object.entries(PAL.GRIPPERS).map(([k, g]) => `<div class="gcard pick ${k === cfg.gripper ? "sel" : ""}" data-pick="gripper" data-val="${k}" tabindex="0">
+        <div class="gimg">${PAL.art.img("gripper", "", k)}</div><div class="gbody"><b>${esc(g.name)}</b><small>${esc(g.note)}</small>
+        <div class="chips"><span class="chip">${g.mass} kg aprox.</span>${k === cfg.gripper ? '<span class="chip blu">Seleccionado</span>' : ""}</div></div></div>`).join("");
+    return `<h3>Elige el robot <span class="pills">${brands}</span></h3>
+      <p class="hint">Necesitas al menos ${f1(need * 1.1)} kg (herramienta + ${ctx.pat.nPick} caja(s) + 10% de margen) y unos ${Math.round(minReach)} mm de alcance para este palet. Haz clic en una tarjeta para seleccionarla.</p>
+      <div class="gallery">${robots}</div>
+      <h3>Elige el PLC <span class="pills">${pbrands}</span></h3><div class="gallery">${plcs}</div>
+      <h3>Elige la HMI</h3><div class="gallery">${hmis}</div>
+      <h3>Elige la herramienta</h3><div class="gallery">${grips}</div>`;
+  }
+
+  function renderGuide() {
+    $("#t-gui").innerHTML = `<h2>Guía visual de la celda</h2>
+      <p class="lead">Una celda paletizadora tiene 4 equipos principales que trabajan juntos. Abajo ves los que elegiste, cómo se conectan, el ciclo paso a paso y galerías para cambiarlos. Las imágenes son ilustraciones esquemáticas; puedes poner tus propias fotos en <code>paletizador/img/</code> (ver README).</p>
+      <h3>1 · Tus equipos</h3>${guideCards()}
+      <h3>2 · Cómo se conectan</h3>${guideArch()}
+      <h3>3 · El ciclo de paletizado</h3>${guideCycle()}
+      <h3>4 · Galerías para elegir</h3>${guideGalleries()}
+      <h3>5 · Glosario</h3>
+      <div class="gloss">${GLOSSARY.map(([t, d]) => `<details><summary>${esc(t)}</summary><p>${esc(d)}</p></details>`).join("")}</div>`;
+  }
+
+  function renderThumbs() {
+    const { cfg } = ctx;
+    const set = (id, html) => { const el = $(id); if (el) el.innerHTML = html; };
+    set("#thRobot", PAL.art.img("robot", cfg.robotBrand, cfg.robotModel, ctx.robot, "art"));
+    set("#thPlc", PAL.art.img("plc", cfg.plcBrand, cfg.plcModel, PAL.PLCS[cfg.plcBrand].models[cfg.plcModel], "art") + PAL.art.img("hmi", cfg.plcBrand, cfg.hmiModel, {}, "art"));
+    set("#thGrip", PAL.art.img("gripper", "", cfg.gripper, {}, "art"));
+  }
+
+  function addHelp() {
+    Object.entries(HELP).forEach(([k, t]) => {
+      const p = $("#t-" + k);
+      if (p && !p.querySelector(".help")) p.insertAdjacentHTML("afterbegin", `<div class="help"><b>¿Qué ves aquí?</b> ${esc(t)}</div>`);
+    });
+  }
+
   function renderAll() {
+    renderGuide(); renderThumbs();
     renderSummary(); renderLayout(); renderPattern(); renderWobj(); renderComm();
     renderRobot(); renderPLC(); renderHMI(); renderSafety(); renderDocs();
+    addHelp();
   }
 
   /* ---------------- Descargas ---------------- */
@@ -608,10 +761,11 @@
 
   /* ---------------- Eventos ---------------- */
   document.addEventListener("click", (e) => {
-    const t = e.target.closest("button, [data-t]");
+    const t = e.target.closest("button, [data-t], [data-pick]");
     if (!t) return;
+    if (t.dataset.pick) { applyChange(t.dataset.pick, t.dataset.val); toast("Seleccionado: " + t.dataset.val); return; }
     if (t.dataset.t) { $$(".tabs button").forEach((b) => b.classList.toggle("on", b === t)); $$(".panel").forEach((p) => p.classList.toggle("on", p.id === "t-" + t.dataset.t)); return; }
-    if (t.dataset.f) { viewSel[t.dataset.v] = t.dataset.f; ({ rob: renderRobot, plc: renderPLC, hmi: renderHMI })[t.dataset.v](); return; }
+    if (t.dataset.f) { viewSel[t.dataset.v] = t.dataset.f; ({ rob: renderRobot, plc: renderPLC, hmi: renderHMI })[t.dataset.v](); addHelp(); return; }
     if (t.dataset.dl) { download(t.dataset.dl.split("/").pop(), FILES[t.dataset.dl]); return; }
     if (t.dataset.copy) { navigator.clipboard && navigator.clipboard.writeText(FILES[t.dataset.copy]).then(() => toast("Copiado")); return; }
     if (t.dataset.show) { $("#docView").textContent = FILES[t.dataset.show]; $("#docView").scrollIntoView({ behavior: "smooth" }); return; }

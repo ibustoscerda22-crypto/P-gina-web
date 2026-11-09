@@ -22,6 +22,9 @@ en el navegador y se puede exportar e importar como JSON.
 
 ## Salidas
 
+- **Guía visual** (pestaña inicial): ilustraciones del robot, PLC, HMI y herramienta elegidos con sus datos y
+  para qué sirve cada uno; diagrama de conexión maestro/esclavo; el ciclo de paletizado en 8 pasos; galerías
+  para elegir modelos con un clic (marca si la carga y el alcance alcanzan) y un glosario.
 - **Resumen**: verificación de carga, ciclo, alcance, avisos de diseño.
 - **Layout**: vista superior a escala con robot, alcance, palets, infeeds, cerco, puertas, cortinas y frames.
 - **Mosaico**: columna, trabado, espejo o molinete (pinwheel); capas A/B; toma de 1 o 2 cajas por ciclo con
@@ -47,6 +50,12 @@ posición del mosaico (DB_Pattern / PatA-PatB) y la envía al robot. El robot s�
 de error. Si la receta lo pide, al iniciar cada capa el PLC ordena primero la lámina separadora desde el magazín.
 Las coordenadas viajan en el frame del palet, por lo que al calibrar bien el frame todo el mosaico queda correcto
 sin reenseñar puntos.
+
+## Imágenes
+
+Las imágenes son ilustraciones esquemáticas propias (no fotos ni logos de los fabricantes). Para ver fotos
+reales, guarda archivos `.jpg` en `paletizador/img/` con los nombres listados en `img/LEEME.txt`
+(por ejemplo `img/irb-460.jpg`); la app los usa automáticamente y vuelve a la ilustración si no existen.
 
 ## Aviso
 
