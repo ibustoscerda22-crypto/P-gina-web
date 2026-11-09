@@ -1,0 +1,18 @@
+<definition type="element" link_type="simple" version="0.90" width="50" height="50" hotspot_x="15" hotspot_y="25">
+    <uuid uuid="{4cb90899-d762-455f-b589-c42d87069715}" />
+    <names>
+        <name lang="es">Borne de equipo (salida)</name>
+        <name lang="en">Device terminal (output)</name>
+    </names>
+    <elementInformations />
+    <informations>Autor: qetgen. Licencia CC-BY 3.0</informations>
+    <description>
+        <rect x="-12" y="-8" width="24" height="16" antialias="false" style="line-style:normal;line-weight:normal;filling:none;color:black" />
+        <line x1="0" y1="20" x2="0" y2="8" antialias="false" end1="none" end2="none" length1="1.5" length2="1.5" style="line-style:normal;line-weight:normal;filling:none;color:black" />
+        <terminal x="0" y="20" orientation="s" name="" type="Generic" uuid="{e96c5d21-0f90-4b02-ae01-c5da87c28c3f}" />
+        <dynamic_text x="16" y="-10" z="10" rotation="0" uuid="{8f3b6c8f-3852-4592-b4d1-ae0f8b2177f1}" text_from="ElementInfo" Halignment="AlignLeft" Valignment="AlignTop" text_width="-1" keep_visual_rotation="false" frame="false" font="Sans Serif,9,-1,5,50,0,0,0,0,0">
+            <text />
+            <info_name>label</info_name>
+        </dynamic_text>
+    </description>
+</definition>

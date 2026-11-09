@@ -1,0 +1,37 @@
+<definition type="element" link_type="simple" version="0.90" width="100" height="90" hotspot_x="40" hotspot_y="45">
+    <uuid uuid="{6da43690-4578-4da7-be37-96dfe3d35ffb}" />
+    <names>
+        <name lang="es">Partidor suave</name>
+        <name lang="en">Soft starter</name>
+    </names>
+    <elementInformations />
+    <informations>Autor: qetgen. Licencia CC-BY 3.0</informations>
+    <description>
+        <rect x="-30" y="-25" width="60" height="50" antialias="false" style="line-style:normal;line-weight:normal;filling:none;color:black" />
+        <line x1="-20" y1="-40" x2="-20" y2="-25" antialias="false" end1="none" end2="none" length1="1.5" length2="1.5" style="line-style:normal;line-weight:normal;filling:none;color:black" />
+        <line x1="-20" y1="25" x2="-20" y2="40" antialias="false" end1="none" end2="none" length1="1.5" length2="1.5" style="line-style:normal;line-weight:normal;filling:none;color:black" />
+        <terminal x="-20" y="-40" orientation="n" name="L1" type="Generic" uuid="{a10c324f-2a32-4352-96ce-290d038c30b3}" />
+        <terminal x="-20" y="40" orientation="s" name="U" type="Generic" uuid="{de65a65d-3c9c-485e-8dd7-62ab11a0ee3b}" />
+        <text x="-18" y="-28" text="L1" rotation="0" font="Sans Serif,4,-1,5,50,0,0,0,0,0" color="#000000" />
+        <text x="-18" y="34" text="U" rotation="0" font="Sans Serif,4,-1,5,50,0,0,0,0,0" color="#000000" />
+        <line x1="0" y1="-40" x2="0" y2="-25" antialias="false" end1="none" end2="none" length1="1.5" length2="1.5" style="line-style:normal;line-weight:normal;filling:none;color:black" />
+        <line x1="0" y1="25" x2="0" y2="40" antialias="false" end1="none" end2="none" length1="1.5" length2="1.5" style="line-style:normal;line-weight:normal;filling:none;color:black" />
+        <terminal x="0" y="-40" orientation="n" name="L2" type="Generic" uuid="{e61b5c82-e800-4659-ad57-2a5f612acc79}" />
+        <terminal x="0" y="40" orientation="s" name="V" type="Generic" uuid="{f8082bdb-3095-47f0-85aa-59b103d01b36}" />
+        <text x="2" y="-28" text="L2" rotation="0" font="Sans Serif,4,-1,5,50,0,0,0,0,0" color="#000000" />
+        <text x="2" y="34" text="V" rotation="0" font="Sans Serif,4,-1,5,50,0,0,0,0,0" color="#000000" />
+        <line x1="20" y1="-40" x2="20" y2="-25" antialias="false" end1="none" end2="none" length1="1.5" length2="1.5" style="line-style:normal;line-weight:normal;filling:none;color:black" />
+        <line x1="20" y1="25" x2="20" y2="40" antialias="false" end1="none" end2="none" length1="1.5" length2="1.5" style="line-style:normal;line-weight:normal;filling:none;color:black" />
+        <terminal x="20" y="-40" orientation="n" name="L3" type="Generic" uuid="{dd61c44b-3ed7-4ac4-bb53-60a023543bb6}" />
+        <terminal x="20" y="40" orientation="s" name="W" type="Generic" uuid="{4a86f554-f05e-48e4-b2c8-b244927854e7}" />
+        <text x="22" y="-28" text="L3" rotation="0" font="Sans Serif,4,-1,5,50,0,0,0,0,0" color="#000000" />
+        <text x="22" y="34" text="W" rotation="0" font="Sans Serif,4,-1,5,50,0,0,0,0,0" color="#000000" />
+        <dynamic_text x="36" y="-12" z="10" rotation="0" uuid="{d638e062-be67-4d2b-9aa1-c27e496728f4}" text_from="ElementInfo" Halignment="AlignLeft" Valignment="AlignTop" text_width="-1" keep_visual_rotation="false" frame="false" font="Sans Serif,9,-1,5,50,0,0,0,0,0">
+            <text />
+            <info_name>label</info_name>
+        </dynamic_text>
+        <polygon antialias="false" closed="false" style="line-style:normal;line-weight:normal;filling:none;color:black" x1="-22" y1="15" x2="-8" y2="15" x3="12" y3="-12" x4="22" y4="-12" />
+        <text x="-24" y="-12" text="U" rotation="0" font="Sans Serif,7,-1,5,50,0,0,0,0,0" color="#000000" />
+        <text x="10" y="21" text="t" rotation="0" font="Sans Serif,7,-1,5,50,0,0,0,0,0" color="#000000" />
+    </description>
+</definition>

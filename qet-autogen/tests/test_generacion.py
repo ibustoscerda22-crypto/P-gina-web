@@ -24,7 +24,8 @@ def test_conductores_apuntan_a_bornes_existentes(tmp_path):
     for diagram in root.iter("diagram"):
         ids = {t.get("id") for t in diagram.iter("terminal") if t.get("id")}
         conds = list(diagram.find("conductors"))
-        assert conds, "folio sin conductores"
+        if diagram.get("title").startswith(("Fuerza", "Mando")):
+            assert conds, "folio sin conductores"
         for c in conds:
             assert c.get("terminal1") in ids and c.get("terminal2") in ids
 

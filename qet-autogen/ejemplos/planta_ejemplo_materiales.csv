@@ -1,36 +1,53 @@
 ﻿Etiqueta;Equipo;Función;Folio
-Q1;Disyuntor termico magnetico en 4P;Interruptor general 4P 63 A;1 - Fuerza
-QM1;Disyuntor termico magnetico 3P mando rotatorio;4-6,3 A;1 - Fuerza
-M1;Motor trifásico;Cinta transportadora 2,2 kW;1 - Fuerza
-Q2;Disyuntor termico magnetico en 3P;;1 - Fuerza
-F1;Relé térmico;;1 - Fuerza
-M2;Motor trifásico;Portón 1,5 kW;1 - Fuerza
-Q3;Disyuntor termico magnetico en 3P;;1 - Fuerza
-F2;Relé térmico;;1 - Fuerza
-M3;Motor trifásico 6 polos;Bomba principal 15 kW;1 - Fuerza
-Q4;Disyuntor termico magnetico en polo P+N;Mando 220 VAC;2 - Fuerza (2)
-S1;Paro de emergencia (NC);Parada de emergencia;3 - Mando
-S2;Pulsador (NC);Paro;3 - Mando
-S3;Pulsador;Marcha;3 - Mando
-KM1;Bobina;Cinta transportadora;3 - Mando
-H1;Lámpara;Cinta transportadora en marcha (verde);3 - Mando
-H2;Lámpara;Cinta transportadora falla (rojo);3 - Mando
-S4;Pulsador (NC);Paro;3 - Mando
-S5;Pulsador;Adelante;3 - Mando
-KM2;Bobina;Portón adelante;3 - Mando
-S6;Pulsador;Atrás;3 - Mando
-KM3;Bobina;Portón atrás;3 - Mando
-H3;Lámpara;Portón en marcha (verde);3 - Mando
-H4;Lámpara;Portón falla (rojo);3 - Mando
-S7;Pulsador (NC);Paro;4 - Mando (2)
-S8;Pulsador;Marcha;4 - Mando (2)
-KM4;Bobina;Bomba principal línea;4 - Mando (2)
-KT1;Bobina de trabajo temporizado;Temporizador Y-D;4 - Mando (2)
-KM5;Bobina;Estrella;4 - Mando (2)
-KM6;Bobina;Triángulo;4 - Mando (2)
-H5;Lámpara;Bomba principal en marcha (verde);4 - Mando (2)
-H6;Lámpara;Bomba principal falla (rojo);4 - Mando (2)
-S9;Interruptor de 2 posiciónes;On/Off;4 - Mando (2)
-Y1;Electroválvula;Válvula de llenado;4 - Mando (2)
-S10;Interruptor de 2 posiciónes;On/Off;4 - Mando (2)
-H7;Lampara intermitente;Baliza de alarma;4 - Mando (2)
+Q1;Disyuntor termico magnetico en 4P;Interruptor general 4P 63 A;2 - Fuerza
+QM1;Disyuntor termico magnetico 3P mando rotatorio;4-6,3 A;2 - Fuerza
+M1;Motor trifásico;Cinta transportadora 2,2 kW;2 - Fuerza
+Q2;Disyuntor termico magnetico en 3P;;2 - Fuerza
+F1;Relé térmico;;2 - Fuerza
+M2;Motor trifásico;Portón 1,5 kW;2 - Fuerza
+Q3;Disyuntor termico magnetico en 3P;;2 - Fuerza
+F2;Relé térmico;;2 - Fuerza
+M3;Motor trifásico 6 polos;Bomba principal 15 kW;2 - Fuerza
+Q4;Disyuntor termico magnetico en 3P;;3 - Fuerza (2)
+U1;Variador de frecuencia;Variador de frecuencia 5,5 kW 380 V;3 - Fuerza (2)
+M4;Motor trifásico;Ventilador 5,5 kW;3 - Fuerza (2)
+QM2;Disyuntor termico magnetico 3P mando rotatorio;;3 - Fuerza (2)
+U2;Partidor suave;Partidor suave;3 - Fuerza (2)
+M5;Motor trifásico;Molino 22 kW;3 - Fuerza (2)
+Q5;Disyuntor termico magnetico en polo P+N;Mando 220 VAC;3 - Fuerza (2)
+S1;Paro de emergencia (NC);Parada de emergencia;4 - Mando
+S2;Pulsador (NC);Paro;4 - Mando
+S3;Pulsador;Marcha;4 - Mando
+KM1;Bobina;Cinta transportadora;4 - Mando
+H1;Lámpara;Cinta transportadora en marcha (verde);4 - Mando
+H2;Lámpara;Cinta transportadora falla (rojo);4 - Mando
+S4;Pulsador (NC);Paro;4 - Mando
+S5;Pulsador;Adelante;4 - Mando
+KM2;Bobina;Portón adelante;4 - Mando
+S6;Pulsador;Atrás;4 - Mando
+KM3;Bobina;Portón atrás;4 - Mando
+H3;Lámpara;Portón en marcha (verde);4 - Mando
+H4;Lámpara;Portón falla (rojo);4 - Mando
+S7;Pulsador (NC);Paro;5 - Mando (2)
+S8;Pulsador;Marcha;5 - Mando (2)
+KM4;Bobina;Bomba principal línea;5 - Mando (2)
+KT1;Bobina de trabajo temporizado;Temporizador Y-D;5 - Mando (2)
+KM5;Bobina;Estrella;5 - Mando (2)
+KM6;Bobina;Triángulo;5 - Mando (2)
+H5;Lámpara;Bomba principal en marcha (verde);5 - Mando (2)
+H6;Lámpara;Bomba principal falla (rojo);5 - Mando (2)
+S9;Pulsador (NC);Paro;5 - Mando (2)
+S10;Pulsador;Marcha;5 - Mando (2)
+KA1;Bobina;Ventilador marcha;5 - Mando (2)
+H7;Lámpara;Ventilador en marcha (verde);5 - Mando (2)
+H8;Lámpara;Ventilador falla (rojo);5 - Mando (2)
+S11;Pulsador (NC);Paro;6 - Mando (3)
+S12;Pulsador;Marcha;6 - Mando (3)
+KA2;Bobina;Molino marcha;6 - Mando (3)
+KM7;Bobina;Contactor de línea;6 - Mando (3)
+H9;Lámpara;Molino en marcha (verde);6 - Mando (3)
+H10;Lámpara;Molino falla (rojo);6 - Mando (3)
+S13;Interruptor de 2 posiciónes;On/Off;6 - Mando (3)
+Y1;Electroválvula;Válvula de llenado;6 - Mando (3)
+S14;Interruptor de 2 posiciónes;On/Off;6 - Mando (3)
+H11;Lampara intermitente;Baliza de alarma;6 - Mando (3)

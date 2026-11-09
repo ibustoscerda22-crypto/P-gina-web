@@ -4,10 +4,12 @@ Describes **qué** quieres controlar en un archivo YAML (motores, tipo de arranq
 protecciones, pilotos, válvulas...) y el programa genera un proyecto **QElectroTech
 (`.qet`)** con:
 
+- **Portada e índice** de folios con los datos del proyecto.
 - **Esquema de fuerza** (multifilar): acometida, interruptor general, barras L1-L2-L3-N-PE,
-  guardamotor o disyuntor + relé térmico, contactores y motor de cada salida.
+  guardamotor o disyuntor (+ relé térmico), contactores, variador o partidor suave y motor.
 - **Esquema de mando** (en escalera): parada de emergencia, marcha/paro con
-  autorretención, enclavamientos, temporizador estrella-triángulo, pilotos de marcha y falla.
+  autorretención, enclavamientos, temporizador estrella-triángulo, orden de marcha a
+  variadores/partidores (relé KA → entrada digital), pilotos de marcha y falla.
 - **Referencias cruzadas** reales de QElectroTech: cada bobina sabe dónde están sus
   contactos (de fuerza y auxiliares), y los contactos muestran dónde está su bobina.
 - **Flechas de continuación** enlazadas entre folios (los rieles L / N y las barras siguen en
@@ -22,6 +24,7 @@ cualquier proyecto hecho a mano.
 | Fuerza | Mando |
 |---|---|
 | ![fuerza](docs/fuerza.png) | ![mando](docs/mando.png) |
+| ![fuerza 2](docs/fuerza2.png) | ![mando 2](docs/mando2.png) |
 
 ## Instalación
 
@@ -58,18 +61,27 @@ alimentacion:
   interruptor_general: Interruptor general 4P 63 A
 
 parada_emergencia: true
+portada: true            # folio 1 con datos e índice
+numerar_fuerza: false    # mostrar o no los números de cable en los folios de fuerza
 
 cargas:
   - tipo: motor
     tag: M1
     descripcion: Cinta transportadora
     potencia: 2,2 kW
-    arranque: directo           # directo | inversor | estrella_triangulo
-    proteccion: guardamotor     # guardamotor | disyuntor_termico
+    arranque: directo           # directo | inversor | estrella_triangulo | variador | partidor_suave
+    proteccion: guardamotor     # guardamotor | disyuntor_termico | disyuntor
     ajuste: 4-6,3 A
     mando: pulsadores           # pulsadores | selector
     piloto_marcha: true
     piloto_falla: true
+
+  - tipo: motor
+    tag: M4
+    descripcion: Ventilador
+    arranque: variador          # protección por defecto: disyuntor
+    modelo: 5,5 kW 380 V
+    contactor_linea: false      # por defecto: false en variador, true en partidor suave
 
   - tipo: electrovalvula        # electrovalvula | lampara | baliza | rele
     descripcion: Válvula de llenado
@@ -85,6 +97,7 @@ y su resultado en `ejemplos/planta_ejemplo.qet`.
 |---|---|
 | `qetgen/library.py` | Lee los símbolos `.elmt` (bornes, tipo maestro/esclavo, posición de etiqueta). |
 | `qetgen/symbols.py` | Alias en español → símbolo de la biblioteca. **Aquí se cambian los símbolos.** |
+| `herramientas/crear_simbolos.py` | Dibuja los símbolos propios (variador, partidor suave, bornes de equipo). |
 | `qetgen/project.py` | Modelo del proyecto (folios, elementos, conductores) y escritura del XML `.qet`. |
 | `qetgen/circuits.py` | Generadores de fuerza y mando (arranque directo, inversor, estrella-triángulo...). |
 | `qetgen/bom.py` | Lista de materiales CSV. |
@@ -120,6 +133,5 @@ p.save("prueba.qet")
 ## Próximos pasos
 
 - Ajustar el estilo (cajetín, numeración, símbolos, distribución) a los planos de referencia.
-- Más tipos de arranque/cargas: variador de frecuencia, partidor suave, Dahlander,
-  monofásicos, entradas/salidas de PLC, borneras.
-- Folio de portada e índice, y borneras con numeración.
+- Más tipos de arranque/cargas: Dahlander, monofásicos, entradas/salidas de PLC.
+- Borneras con numeración y folio de borneras.

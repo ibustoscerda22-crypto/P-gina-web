@@ -46,3 +46,16 @@ cargas:
   - tipo: baliza
     descripcion: Baliza de alarma
     mando: selector
+
+  - tipo: motor
+    tag: M4
+    descripcion: Ventilador
+    potencia: 5,5 kW
+    arranque: variador         # protección por defecto: disyuntor
+    modelo: 5,5 kW 380 V
+
+  - tipo: motor
+    tag: M5
+    descripcion: Molino
+    potencia: 22 kW
+    arranque: partidor_suave   # incluye contactor de línea por defecto

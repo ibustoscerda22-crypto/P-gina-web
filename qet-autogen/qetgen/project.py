@@ -233,6 +233,7 @@ class Folio:
 
     def __init__(self, project: "Project", title: str, rows: int = 8):
         self.ROWS = rows
+        self.show_numbers = True  # False: los números de conductor no se muestran en este folio
         self.project = project
         self.title = title
         self.elements: list[Element] = []
@@ -294,6 +295,8 @@ class Folio:
             els.append(el.to_xml())
         cs = ET.SubElement(d, "conductors")
         for c in self.conductors:
+            if not self.show_numbers:
+                c.show_num = False
             cs.append(c.to_xml())
         ins = ET.SubElement(d, "inputs")
         for t in self.texts:

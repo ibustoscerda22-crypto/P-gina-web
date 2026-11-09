@@ -47,6 +47,11 @@ SYMBOLS = {
     "motor_3f": _A + "391_consumers_actuators/10_engines/moteur_tri_1.elmt",
     "motor_3f_6bornes": _A + "391_consumers_actuators/10_engines/moteur_tri_de.elmt",
     "electrovalvula": _A + "391_consumers_actuators/20_valves/electrovanne.elmt",
+    # Símbolos propios (qetgen/elementos/99_qetgen, ver herramientas/crear_simbolos.py)
+    "variador": "99_qetgen/variador.elmt",
+    "partidor_suave": "99_qetgen/partidor_suave.elmt",
+    "borne_equipo_salida": "99_qetgen/borne_equipo_salida.elmt",
+    "borne_equipo_entrada": "99_qetgen/borne_equipo_entrada.elmt",
 }
 
 

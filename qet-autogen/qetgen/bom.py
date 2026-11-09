@@ -13,7 +13,8 @@ def write_bom(project: Project, path: str | Path) -> Path:
     rows = []
     for n, f in enumerate(project.folios, 1):
         for el in f.elements:
-            if el.definition.link_type in SKIP or not el.label or el.label == "RED":
+            if (el.definition.link_type in SKIP or not el.label or el.label == "RED"
+                    or "borne_equipo" in el.definition.path):
                 continue
             funcion = " ".join(t.text.replace("\n", " ") for t in el.texts if t.text)
             rows.append((el.label, el.definition.name("es"), funcion, f"{n} - {f.title}"))

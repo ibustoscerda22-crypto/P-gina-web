@@ -112,6 +112,7 @@ class PowerSheet:
     def new_folio(self) -> Folio:
         n = sum(1 for f in self.gen.project.folios if f.title.startswith("Fuerza"))
         self.folio = self.gen.project.folio("Fuerza" + (f" ({n + 1})" if n else ""), ROWS)
+        self.folio.show_numbers = bool(self.gen.spec.get("numerar_fuerza", False))
         self.x = 80
         return self.folio
 
@@ -128,9 +129,9 @@ class PowerSheet:
         f = self.new_folio()
         src = f.add("fuente_3f_n_pe", 40, 80, "RED")
         tension = spec.get("tension", "3x400/230 V 50 Hz")
-        f.text(f"Acometida {tension}", 110, 8, 8, True)
+        f.text(f"Acometida {tension}", 130, 22, 8, True)
         q0 = f.add("interruptor_4p", 140, 170, self.gen.names("Q"))
-        q0.add_text(spec.get("interruptor_general", "Interruptor general"), 40, -20)
+        q0.add_text(wrap(spec.get("interruptor_general", "Interruptor general"), 18), 46, 2)
         tops = q0.tops()
         for i, ph in enumerate(("L1", "L2", "L3", "N")):
             a = src.right(i)
@@ -153,13 +154,14 @@ class PowerSheet:
         if m.proteccion == "guardamotor":
             q = place(f, "guardamotor", x0 - 20, self.TOP, m.q)
             q.add_text(m.spec.get("ajuste", ""), 30, -45)
-        else:
+        else:  # disyuntor_termico | disyuntor
             q = place(f, "interruptor_3p", x0 - 20, self.TOP, m.q)
+            q.add_text(m.spec.get("interruptor", ""), 32, -40)
         self.tap3(f, q)
         return q
 
     def thermal(self, f: Folio, x0: float, m: "MotorCtx", above: list[Terminal]) -> list[Terminal]:
-        if m.proteccion == "guardamotor":
+        if m.proteccion != "disyuntor_termico":
             return above
         fr = place(f, "rele_termico", x0 - 20, self.F_TOP, m.f)
         fr.add_text(m.spec.get("ajuste", ""), 50, 18)
@@ -193,10 +195,10 @@ class PowerSheet:
         m.prot_el = q
 
     def inversor(self, m: "MotorCtx") -> None:
-        f, x0 = self.reserve(220)
+        f, x0 = self.reserve(260)
         q = self.protection(f, x0, m)
         km1 = place(f, "contactor_3p", x0 - 20, self.KM_TOP, m.km[0])
-        km2 = place(f, "contactor_3p", x0 + 60, self.KM_TOP, m.km[1])
+        km2 = place(f, "contactor_3p", x0 + 80, self.KM_TOP, m.km[1])
         for i, (a, b) in enumerate(zip(q.bottoms(), km1.tops())):
             f.wire(a, b)
             f.wire(km1.tops()[i], km2.tops()[i], y=self.KM_TOP - 30 + 8 * i)
@@ -224,7 +226,7 @@ class PowerSheet:
         mot.add_text(self.motor_text(m), -95, -10)
         pe = mot.pin("PE")
         px, py = pe.pos
-        self.pe.attach(f, pe, self.PE_Y, via=[(px + 16, self.PE_Y), (px + 16, py - 10), (px, py - 10)])
+        self.pe.attach(f, pe, self.PE_Y, via=[(px + 40, self.PE_Y), (px + 40, py - 10), (px, py - 10)])
         # KM3 triángulo, alimentado aguas abajo de KM1: L1->W2, L2->U2, L3->V2
         km3 = place(f, "contactor_3p", xb - 20, self.F_TOP, m.km[2])
         for i, (a, b) in enumerate(zip(km1.bottoms(), km3.tops())):
@@ -243,10 +245,35 @@ class PowerSheet:
         m.power_contacts = [km1, km2, km3]
         m.prot_el = q
 
+    def _drive(self, m: "MotorCtx", symbol: str, title: str) -> None:
+        """Salida con variador o partidor suave (contactor de línea opcional)."""
+        f, x0 = self.reserve(150)
+        q = self.protection(f, x0, m)
+        above = q.bottoms()
+        if m.km:
+            km = place(f, "contactor_3p", x0 - 20, self.KM_TOP - 10, m.km[0])
+            for a, b in zip(above, km.tops()):
+                f.wire(a, b)
+            above = km.bottoms()
+            m.power_contacts = [km]
+        d = place(f, symbol, x0 - 20, 500, m.u)
+        d.add_text(wrap(" ".join(v for v in (title, m.spec.get("modelo", "")) if v), 14), 36, 4)
+        for a, b in zip(above, d.tops()):
+            f.wire(a, b)
+        self.motor(f, x0, m, d.bottoms())
+        m.prot_el = q
+        m.drive_el = d
+
+    def variador(self, m: "MotorCtx") -> None:
+        self._drive(m, "variador", "Variador de frecuencia")
+
+    def partidor_suave(self, m: "MotorCtx") -> None:
+        self._drive(m, "partidor_suave", "Partidor suave")
+
     def control_supply(self, spec: dict) -> tuple[Terminal, Terminal]:
         f, x0 = self.reserve(100)
         q = place(f, "interruptor_1p_n", x0 - 10, self.TOP, self.gen.names("Q"))
-        q.add_text("Mando " + spec.get("tension_mando", "230 VAC"), 30, 30)
+        q.add_text("Mando " + spec.get("tension_mando", "230 VAC"), 30, -45)
         self.buses["L1"].attach(f, q.tops()[0], self.BUS_Y["L1"])
         self.buses["N"].attach(f, q.tops()[1], self.BUS_Y["N"])
         return q.bottoms()[0], q.bottoms()[1]
@@ -305,7 +332,8 @@ class Ladder:
             if els:
                 f.wire(els[-1].bottoms()[0], el.tops()[0])
             els.append(el)
-            y = el.bottoms()[0].pos[1] + self.GAP
+            ys = [t.pos[1] for t in el.terminals]
+            y = max(ys) + self.GAP
         return els
 
     def to_rails(self, f: Folio, els: list[Element], start: str | Terminal = "L'", end="N",
@@ -355,11 +383,17 @@ class MotorCtx:
     power_contacts: list[Element] = field(default_factory=list)
     prot_el: Element | None = None
     thermal_el: Element | None = None
+    u: str = ""
+    drive_el: Element | None = None
 
 
 # ----------------------------------------------------------------------------
 # Generador principal
 # ----------------------------------------------------------------------------
+ARRANQUES = ("directo", "inversor", "estrella_triangulo", "variador", "partidor_suave")
+PROTECCIONES = ("guardamotor", "disyuntor_termico", "disyuntor")
+
+
 class Generator:
     def __init__(self, spec: dict, library=None):
         self.spec = spec
@@ -390,21 +424,53 @@ class Generator:
         for c in cargas:
             if c.get("tipo", "motor") != "motor":
                 self._control_simple(c)
+        if self.spec.get("portada", True):
+            self._cover()
         self.project.autonumber()
         return self.project
+
+    def _cover(self) -> None:
+        """Folio 1: carátula con datos del proyecto e índice de folios."""
+        pr = self.project
+        f = pr.folio("Portada e índice", ROWS)
+        pr.folios.insert(0, pr.folios.pop())
+        p = self.spec.get("proyecto", {})
+        f.text(pr.title, 60, 80, 22, True)
+        y = 150
+        for k, v in (("Cliente", p.get("cliente", "")), ("Planta", pr.plant), ("Ubicación", pr.location),
+                     ("Autor", pr.author), ("Fecha", pr.date.strftime("%d-%m-%Y")), ("Revisión", pr.revision),
+                     ("Alimentación", self.spec.get("alimentacion", {}).get("tension", "")),
+                     ("Tensión de mando", self.spec.get("alimentacion", {}).get("tension_mando", ""))):
+            if v:
+                f.text(f"{k}:", 60, y, 10, True)
+                f.text(str(v), 220, y, 10)
+                y += 26
+        f.text("Índice de folios", 560, 150, 12, True)
+        for i, fo in enumerate(pr.folios, 1):
+            f.text(f"{i:>2}", 560, 160 + i * 24, 10)
+            f.text(fo.title, 600, 160 + i * 24, 10)
+        f.text("Generado con qetgen para QElectroTech", 60, 660, 7)
 
     # ------------------------------------------------------------------
     def _power_motor(self, c: dict) -> None:
         arr = c.get("arranque", "directo")
-        nkm = {"directo": 1, "inversor": 2, "estrella_triangulo": 3}[arr]
-        prot = c.get("proteccion", "guardamotor")
+        if arr not in ARRANQUES:
+            raise ValueError(f"Arranque desconocido '{arr}'. Opciones: {', '.join(ARRANQUES)}")
+        drive = arr in ("variador", "partidor_suave")
+        nkm = {"directo": 1, "inversor": 2, "estrella_triangulo": 3}.get(arr, 0)
+        if drive and c.get("contactor_linea", arr == "partidor_suave"):
+            nkm = 1
+        prot = c.get("proteccion", "disyuntor" if arr == "variador" else "guardamotor")
+        if prot not in PROTECCIONES:
+            raise ValueError(f"Protección desconocida '{prot}'. Opciones: {', '.join(PROTECCIONES)}")
         m = MotorCtx(
             spec=c, m=c.get("tag") or self.names("M"),
             q=self.names("QM" if prot == "guardamotor" else "Q"),
-            f=self.names("F") if prot != "guardamotor" else "",
+            f=self.names("F") if prot == "disyuntor_termico" else "",
             km=[self.names("KM") for _ in range(nkm)],
             kt=self.names("KT") if arr == "estrella_triangulo" else "",
             proteccion=prot,
+            u=self.names("U") if drive else "",
         )
         getattr(self.power, arr)(m)
         self.motors.append(m)
@@ -421,48 +487,59 @@ class Generator:
         f.text("Circuito de mando " + self.spec.get("alimentacion", {}).get("tension_mando", "230 VAC"),
                20, 10, 8, True)
 
-    def _prot_contact(self, m: MotorCtx, normally_open=False) -> Item:
+    def _prot_contact(self, m: MotorCtx, normally_open=False) -> Item | None:
+        if m.proteccion == "disyuntor":
+            return None
         if m.proteccion == "guardamotor":
             sym = "contacto_guardamotor_na" if normally_open else "contacto_guardamotor_nc"
             return Item(sym, m.q, m.prot_el)
         sym = "contacto_termico_na" if normally_open else "contacto_termico_nc"
         return Item(sym, m.f, m.thermal_el)
 
+    def _start_stop(self, m: MotorCtx, f: Folio, x: float, x_hold: float, coil: str,
+                    text: str, mando: str, coil_symbol: str = "bobina"):
+        """Línea de marcha/paro: [protección] [paro] [marcha || autorretención] [bobina].
+        Devuelve (elementos de la línea, elemento de marcha)."""
+        L = self.ladder
+        pre = [i for i in (self._prot_contact(m),) if i]
+        if mando == "selector":
+            cmd = [Item("selector", self.names("S"), text="Marcha/Paro")]
+        else:
+            cmd = [Item("pulsador_nc", self.names("S"), text="Paro"),
+                   Item("pulsador_na", self.names("S"), text="Marcha")]
+        els = L.column(f, x, pre + cmd + [Item(coil_symbol, coil, text=text, load=True)])
+        L.to_rails(f, els)
+        start_el = els[len(pre) + len(cmd) - 1]
+        if mando != "selector":
+            L.parallel(f, x_hold, start_el, Item("contacto_na", coil, els[-1]))
+        return els, start_el
+
     def _control_motor(self, m: MotorCtx) -> None:
         c = m.spec
         arr = c.get("arranque", "directo")
         mando = c.get("mando", "pulsadores")
         desc = c.get("descripcion", m.m)
-        km = m.power_contacts
+        drive = arr in ("variador", "partidor_suave")
         lamps = []
         if c.get("piloto_marcha", True):
-            lamps.append(("marcha", km[0]))
-        if c.get("piloto_falla", True):
-            lamps.append(("falla", None))
-        n_extra = len(lamps)
+            lamps.append("marcha")
+        if c.get("piloto_falla", True) and (drive or m.proteccion != "disyuntor"):
+            lamps.append("falla")
         L = self.ladder
+        hold = 0 if mando == "selector" else 1  # columna extra para la autorretención
 
         if arr == "directo":
-            f, cols = L.reserve(2 + n_extra)
-            items = [self._prot_contact(m)]
-            if mando == "selector":
-                items += [Item("selector", self.names("S"), text="Marcha/Paro")]
-            else:
-                items += [Item("pulsador_nc", self.names("S"), text="Paro"),
-                          Item("pulsador_na", self.names("S"), text="Marcha")]
-            items += [Item("bobina", m.km[0], text=desc, load=True)]
-            els = L.column(f, cols[0], items)
-            L.to_rails(f, els)
-            if mando != "selector":
-                L.parallel(f, cols[1], els[2], Item("contacto_na", m.km[0], els[-1]))
+            f, cols = L.reserve(1 + hold + len(lamps))
+            els, _ = self._start_stop(m, f, cols[0], cols[-1] if not hold else cols[1], m.km[0], desc, mando)
             coils = {m.km[0]: els[-1]}
-            lamp_cols = cols[2:]
+            run = m.km[0]
+            lamp_cols = cols[1 + hold:]
 
         elif arr == "inversor":
-            f, cols = L.reserve(4 + n_extra)
+            f, cols = L.reserve(4 + len(lamps))
             k1, k2 = m.km
-            common = L.column(f, cols[0], [self._prot_contact(m),
-                                           Item("pulsador_nc", self.names("S"), text="Paro")])
+            pre = [i for i in (self._prot_contact(m),) if i]
+            common = L.column(f, cols[0], pre + [Item("pulsador_nc", self.names("S"), text="Paro")])
             L.to_rails(f, common, end=None)
             node = common[-1].bottoms()[0]
             y1 = node.pos[1] + L.GAP
@@ -479,18 +556,14 @@ class Generator:
             L.parallel(f, cols[1], r1[0], Item("contacto_na", k1, r1[-1]))
             L.parallel(f, cols[3], r2[0], Item("contacto_na", k2, r2[-1]))
             coils = {k1: r1[-1], k2: r2[-1]}
+            run = k1
             lamp_cols = cols[4:]
 
-        else:  # estrella_triangulo
-            f, cols = L.reserve(5 + n_extra)
+        elif arr == "estrella_triangulo":
+            f, cols = L.reserve(5 + len(lamps))
             k1, k2, k3 = m.km
-            main = L.column(f, cols[0], [self._prot_contact(m),
-                                         Item("pulsador_nc", self.names("S"), text="Paro"),
-                                         Item("pulsador_na", self.names("S"), text="Marcha"),
-                                         Item("bobina", k1, text=f"{desc} línea", load=True)])
-            L.to_rails(f, main)
-            L.parallel(f, cols[1], main[2], Item("contacto_na", k1, main[-1]))
-            node = main[2].bottoms()[0]
+            main, start_el = self._start_stop(m, f, cols[0], cols[1], k1, f"{desc} línea", "pulsadores")
+            node = start_el.bottoms()[0]
             y1 = node.pos[1] + L.GAP
             kt = L.column(f, cols[2], [Item("bobina_temporizada", m.kt, text="Temporizador Y-D", load=True)])
             f.wire(node, kt[0].tops()[0], y=node.pos[1] + 10)
@@ -505,19 +578,48 @@ class Generator:
             star[1].link(delta[-1])
             delta[1].link(star[-1])
             coils = {k1: main[-1], k2: star[-1], k3: delta[-1], m.kt: kt[0]}
+            run = k1
             lamp_cols = cols[5:]
+
+        else:  # variador | partidor_suave
+            ka = self.names("KA")
+            n_km = len(m.km)
+            f, cols = L.reserve(1 + hold + n_km + 1 + len(lamps))
+            main, start_el = self._start_stop(m, f, cols[0], cols[1] if hold else cols[0], ka,
+                                              f"{desc} marcha", mando)
+            coils = {ka: main[-1]}
+            ci = 1 + hold
+            if n_km:
+                node = start_el.bottoms()[0]
+                kmc = L.column(f, cols[ci], [Item("bobina", m.km[0], text="Contactor de línea", load=True)])
+                f.wire(node, kmc[0].tops()[0], y=node.pos[1] + 10)
+                L.N.attach(f, kmc[-1].bottoms()[0], L.RAIL_BOT)
+                coils[m.km[0]] = kmc[0]
+                ci += 1
+            # orden de marcha al equipo (entrada digital con su fuente interna de 24 VDC)
+            di = L.column(f, cols[ci], [Item("borne_equipo_salida", m.u, text="+24V"),
+                                        Item("contacto_na", ka, main[-1]),
+                                        Item("borne_equipo_entrada", m.u, text="DI1 marcha")],
+                          y0=L.FIRST + 60)
+            di[0].add_text(wrap("Orden a " + ("variador" if arr == "variador" else "partidor")
+                                + " (24 VDC interno)", 14), -20, -62)
+            run = ka
+            lamp_cols = cols[ci + 1:]
 
         # enlace contactos de potencia -> bobinas
         for pc in m.power_contacts:
             pc.link(coils[pc.label])
 
-        for (kind, _), x in zip(lamps, lamp_cols):
+        for kind, x in zip(lamps, lamp_cols):
             if kind == "marcha":
-                items = [Item("contacto_na", m.km[0], coils[m.km[0]]),
+                items = [Item("contacto_na", run, coils[run]),
                          Item("lampara", self.names("H"), text=f"{desc} en marcha (verde)", load=True)]
             else:
-                items = [self._prot_contact(m, normally_open=True),
-                         Item("lampara", self.names("H"), text=f"{desc} falla (rojo)", load=True)]
+                if drive:
+                    contact = Item("contacto_na", m.u, text="Relé falla equipo")
+                else:
+                    contact = self._prot_contact(m, normally_open=True)
+                items = [contact, Item("lampara", self.names("H"), text=f"{desc} falla (rojo)", load=True)]
             els = L.column(f, x, items)
             L.to_rails(f, els, start="L" if kind == "falla" else "L'")
 
