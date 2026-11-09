@@ -42,8 +42,11 @@ PAL.genRobot = (function () {
     L.push("");
     L.push("# Señales locales de la herramienta: ajusta -Device al módulo de E/S real del robot");
     const grip = ctx.cfg.gripper === "vacio"
-      ? [["doVacuumOn", "DO", "0"], ["doBlowOff", "DO", "1"], ["diVacuumOK", "DI", "0"], ["diPartPresentTool", "DI", "1"]]
-      : [["doValveClose", "DO", "0"], ["doValveOpen", "DO", "1"], ["diClampClosed", "DI", "0"], ["diClampOpened", "DI", "1"], ["diPartPresentTool", "DI", "2"]];
+      ? [["doVacuumOn", "DO", "0"], ["doBlowOff", "DO", "1"], ["doVacuumOnB", "DO", "2"], ["doSheetVac", "DO", "3"],
+         ["diVacuumOK", "DI", "0"], ["diPartPresentTool", "DI", "1"], ["diVacuumOKB", "DI", "2"], ["diSheetOK", "DI", "3"]]
+      : [["doValveClose", "DO", "0"], ["doValveOpen", "DO", "1"], ["doVacuumOnB", "DO", "2"], ["doSheetVac", "DO", "3"],
+         ["diClampClosed", "DI", "0"], ["diClampOpened", "DI", "1"], ["diPartPresentTool", "DI", "2"], ["diVacuumOKB", "DI", "3"], ["diSheetOK", "DI", "4"]];
+    L.push("# doVacuumOnB/diVacuumOKB = zona B de la herramienta (toma de 2 cajas); doSheetVac/diSheetOK = ventosas de lámina");
     grip.forEach(([n, t, m]) => L.push(`      -Name "${n}" -SignalType "${t}" -Device "LocalIO"\\\n      -DeviceMap "${m}"`));
     L.push("");
     L.push("#");
@@ -78,6 +81,7 @@ PAL.genRobot = (function () {
       return `  PERS wobjdata ${name}:=[FALSE,TRUE,"",[[${f1(fr.x)},${f1(fr.y)},${f1(fr.z)}],[${q.map(f6).join(",")}]],[[0,0,0],[1,0,0,0]]];`;
     };
     const vac = cfg.gripper === "vacio";
+    const np = ctx.pat.nPick || 1;
     const zoneCase = (inOut) => {
       const rows = [];
       lay.pallets.forEach((p) => rows.push(`    CASE ${p.id}:\n      ${inOut === "in" ? `WaitDI diPermitPallet${p.id},1\\MaxTime:=nZoneTmo\\TimeFlag:=bTmo;\n      IF NOT bTmo SetDO doOutPallet${p.id},0;` : `SetDO doOutPallet${p.id},1;`}`));
@@ -93,7 +97,10 @@ ${header(ctx, "  !")}
   ! TCP en la cara de contacto de la herramienta. Medir/verificar con método de 4 puntos o CAD.
   PERS tooldata tGripper:=[TRUE,[[0,0,${f1(cfg.toolTcpZ)}],[1,0,0,0]],[${f1(gm)},[0,0,${f1(cfg.toolTcpZ * 0.45)}],[1,0,0,0],0,0,0]];
   ! Carga útil (caja). Ejecutar LoadIdentify con la carga real si es posible.
-  PERS loaddata ldBox:=[${f1(cfg.boxWeight)},[0,0,${f1(cfg.boxH / 2)}],[1,0,0,0],0,0,0];
+  PERS loaddata ldBox:=[${f1(cfg.boxWeight)},[${np === 2 ? f1(cfg.boxL / 2) : 0},0,${f1(cfg.boxH / 2)}],[1,0,0,0],0,0,0];
+  PERS loaddata ldBox2:=[${f1(cfg.boxWeight * 2)},[0,0,${f1(cfg.boxH / 2)}],[1,0,0,0],0,0,0];
+  ! Cajas por toma de la herramienta (1 = simple, 2 = zonas A+B). Zona A = mitad +X de la herramienta.
+  CONST num NPICK:=${np};
 
   !---------------- Workobjects (valores nominales del layout) ----------------
   ! Calibrar cada uno con el método de 3 puntos (ver pestaña Workobjects) y actualizar.
@@ -108,6 +115,8 @@ ${lay.infeeds.map((f) => wob("wobjInfeed" + f.id, f.frame)).join("\n")}
   PERS robtarget pSafeTop:=[[${f1(ctx.robot.reach * 0.35)},0,${f1(cfg.maxStackH + cfg.outfeedH - cfg.pedestalH + cfg.approachZ)}],[0,1,0,0],[0,0,0,0],[9E9,9E9,9E9,9E9,9E9,9E9]];
   ! Corrección angular de la brida si el eje X de la herramienta no coincide con el largo de la caja
   PERS num nRzOffset:=0;
+  ! pSheetPick: toma de lámina sobre el magazín (wobj0); ENSEÑAR con la pila llena
+  PERS robtarget pSheetPick:=[[${f1(lay.sheet ? lay.sheet.center.x : 0)},${f1(lay.sheet ? lay.sheet.center.y : 0)},${f1(cfg.outfeedH - cfg.pedestalH + 300)}],[0,1,0,0],[0,0,0,0],[9E9,9E9,9E9,9E9,9E9,9E9]];
 
   !---------------- Velocidades ----------------
   PERS speeddata vFast:=[3000,500,5000,1000];
@@ -134,6 +143,7 @@ ${lay.infeeds.map((f) => wob("wobjInfeed" + f.id, f.frame)).join("\n")}
   VAR num nBoxW;
   VAR num nBoxH;
   VAR num nErr;
+  VAR num nZones:=1;
   VAR num nBoxesDone:=0;
   VAR num nCycMs;
   VAR bool bTmo;
@@ -222,6 +232,8 @@ ${lay.infeeds.map((f) => wob("wobjInfeed" + f.id, f.frame)).join("\n")}
     nBoxL:=GInput(giBoxL);
     nBoxW:=GInput(giBoxW);
     nBoxH:=GInput(giBoxH);
+    nZones:=GInput(giGripZones);
+    IF nZones<1 nZones:=1;
     IF nOvr<1 OR nOvr>100 nOvr:=100;
     IF nAppZ<20 nAppZ:=${cfg.approachZ};
     SpeedRefresh nOvr;
@@ -243,7 +255,8 @@ ${lay.infeeds.map((f) => wob("wobjInfeed" + f.id, f.frame)).join("\n")}
     !------ Toma en el infeed ------
     SetGO goStep,10;
     SelWobjInfeed nPick;
-    pTgt:=MakeTarget(-nBoxL/2,nBoxW/2,nBoxH,0);
+    ! TCP al centro de las NPICK cajas que esperan contra el tope
+    pTgt:=MakeTarget(-nBoxL*NPICK/2,nBoxW/2,nBoxH,0);
     CheckHold;
     EnterZone 10+nPick;
     IF nErr<>0 RETURN;
@@ -259,7 +272,11 @@ ${lay.infeeds.map((f) => wob("wobjInfeed" + f.id, f.frame)).join("\n")}
       nErr:=4;
       RETURN;
     ENDIF
-    GripLoad ldBox;
+    IF nZones>=3 THEN
+      GripLoad ldBox2;
+    ELSE
+      GripLoad ldBox;
+    ENDIF
     MoveL Offs(pTgt,0,0,nAppZ),vApp,z50,tGripper\\WObj:=wobjCur;
     LeaveZone 10+nPick;
     !------ Colocación en el palet ------
@@ -288,20 +305,37 @@ ${lay.infeeds.map((f) => wob("wobjInfeed" + f.id, f.frame)).join("\n")}
   ENDPROC
 
   PROC SlipSheet()
-    ! La lámina se toma del magazín con ventosas propias (estación de toma = 5 en el PLC).
-    ! Completar según la herramienta real. Aquí sólo se valida y se reserva la zona.
+    ! Lámina separadora: toma en el magazín (pSheetPick) y deja centrada sobre la capa (X,Y,Z del PLC)
     IF nPlace<1 OR nPlace>${lay.pallets.length} THEN
       nErr:=3;
       RETURN;
     ENDIF
+    SetGO goStep,30;
+    CheckHold;
+    MoveJ Offs(pSheetPick,0,0,nAppZ),vFast,z100,tGripper\\WObj:=wobj0;
+    ! Si la pila del magazín baja, reemplazar por SearchL con sensor de contacto
+    MoveL pSheetPick,vPlace,fine,tGripper\\WObj:=wobj0;
+    SetDO doSheetVac,1;
+    WaitTime 0.3;
+    IF diSheetOK=0 THEN
+      SetDO doSheetVac,0;
+      MoveL Offs(pSheetPick,0,0,nAppZ),vApp,fine,tGripper\\WObj:=wobj0;
+      nErr:=4;
+      RETURN;
+    ENDIF
+    MoveL Offs(pSheetPick,0,0,nAppZ),vApp,z50,tGripper\\WObj:=wobj0;
     SelWobjPallet nPlace;
     pTgt:=MakeTarget(nX,nY,nZ,nRz);
     EnterZone nPlace;
     IF nErr<>0 RETURN;
     MoveJ Offs(pTgt,0,0,nAppZ),vFast,z100,tGripper\\WObj:=wobjCur;
-    ! TODO: bajar, soltar lámina, subir
+    MoveL Offs(pTgt,0,0,10),vPlace,fine,tGripper\\WObj:=wobjCur;
+    SetDO doSheetVac,0;
+    WaitTime 0.2;
+    MoveL Offs(pTgt,0,0,nAppZ),vApp,z50,tGripper\\WObj:=wobjCur;
     MoveJ pSafeTop,vFast,z200,tGripper\\WObj:=wobj0;
     LeaveZone nPlace;
+    SetGO goStep,0;
   ENDPROC
 
   PROC GoHome()
@@ -374,17 +408,19 @@ ${lay.infeeds.map((f) => `    SetDO doOutInfeed${f.id},1;`).join("\n")}
 
   PROC GripOn()
 ${vac ? "    SetDO doBlowOff,0;\n    SetDO doVacuumOn,1;" : "    SetDO doValveOpen,0;\n    SetDO doValveClose,1;"}
+    IF nZones>=3 SetDO doVacuumOnB,1;
   ENDPROC
 
   PROC GripOff()
 ${vac ? "    SetDO doVacuumOn,0;\n    PulseDO\\PLength:=0.2,doBlowOff;" : "    SetDO doValveClose,0;\n    SetDO doValveOpen,1;"}
+    SetDO doVacuumOnB,0;
     SetDO doGripClosed,0;
     SetDO doGripOpen,1;
   ENDPROC
 
   FUNC bool GripOK()
     VAR bool ok;
-    ok:=${vac ? "diVacuumOK=1" : "diClampClosed=1"} AND diPartPresentTool=1;
+    ok:=${vac ? "diVacuumOK=1" : "diClampClosed=1"} AND diPartPresentTool=1 AND (nZones<3 OR diVacuumOKB=1);
     IF ok THEN
       SetDO doGripClosed,1;
       SetDO doGripOpen,0;
@@ -459,6 +495,7 @@ CONTROL_CODE	= 00000000 00000000;
       `R[14:BoxL]=GI[${fGI("BoxL")}]`,
       `R[15:BoxW]=GI[${fGI("BoxW")}]`,
       `R[16:BoxH]=GI[${fGI("BoxH")}]`,
+      `R[17:Zones]=GI[${fGI("GripZones")}]`,
       `DO[${fDO("CmdDone")}:CmdDone]=OFF`,
       `GO[${fGO("CmdIDEcho")}:CmdIDEcho]=R[1]`,
       `DO[${fDO("CmdAck")}:CmdAck]=ON`,
@@ -472,6 +509,7 @@ CONTROL_CODE	= 00000000 00000000;
       "OVERRIDE=R[13]%",
       "SELECT R[2]=1,CALL PAL_PICKPLACE",
       "       =2,CALL PAL_HOME",
+      "       =3,CALL PAL_SHEET",
       "       =4,CALL PAL_HOME",
       "       =5,CALL PAL_GRIPTEST",
       "       ELSE,R[20]=1",
@@ -508,7 +546,7 @@ CONTROL_CODE	= 00000000 00000000;
       "!herramienta abajo (ENSENAR)",
       "PR[11]=PR[10]",
       "R[25]=0-R[14]",
-      "PR[11,1]=R[25]/2",
+      ctx.pat.nPick === 2 ? "PR[11,1]=R[25]" : "PR[11,1]=R[25]/2",
       "PR[11,2]=R[15]/2",
       "PR[11,3]=R[16]",
       "PR[12]=PR[10]-PR[10]",
@@ -525,7 +563,13 @@ CONTROL_CODE	= 00000000 00000000;
       "CALL PAL_GRIPON",
       "WAIT .25(sec)",
       "IF RI[1:ToolOK]=OFF,JMP LBL[94]",
+      "IF (R[17]>=3 AND RI[3:ToolOKB]=OFF),JMP LBL[94]",
+      "IF R[17]<3,JMP LBL[31]",
+      "PAYLOAD[3]",
+      "JMP LBL[32]",
+      "LBL[31]",
       "PAYLOAD[2]",
+      "LBL[32]",
       "L PR[11] 1500mm/sec CNT50 Offset,PR[12]",
       "DO[R[23]]=ON",
       "!--- COLOCACION: UF 1..4 = palets ---",
@@ -602,11 +646,56 @@ CONTROL_CODE	= 00000000 00000000;
         "LBL[1]"
       ]),
       "PAL_GRIPON.LS": lsHeader("PAL_GRIPON", "Toma producto") + lsBody(vac
-        ? [`RO[2:Soplado]=OFF`, `RO[1:Vacio]=ON`, `DO[${fDO("GripOpen")}:GripOpen]=OFF`, `DO[${fDO("GripClosed")}:GripClosed]=ON`]
-        : [`RO[2:Abrir]=OFF`, `RO[1:Cerrar]=ON`, `DO[${fDO("GripOpen")}:GripOpen]=OFF`, `DO[${fDO("GripClosed")}:GripClosed]=ON`]),
+        ? [`RO[2:Soplado]=OFF`, `RO[1:Vacio]=ON`, `DO[${fDO("GripOpen")}:GripOpen]=OFF`, `DO[${fDO("GripClosed")}:GripClosed]=ON`, "IF R[17]<3,JMP LBL[1]", "RO[3:VacioB]=ON", "LBL[1]"]
+        : [`RO[2:Abrir]=OFF`, `RO[1:Cerrar]=ON`, `DO[${fDO("GripOpen")}:GripOpen]=OFF`, `DO[${fDO("GripClosed")}:GripClosed]=ON`, "IF R[17]<3,JMP LBL[1]", "RO[3:VacioB]=ON", "LBL[1]"]),
       "PAL_GRIPOFF.LS": lsHeader("PAL_GRIPOFF", "Suelta producto") + lsBody(vac
-        ? [`RO[1:Vacio]=OFF`, `RO[2:Soplado]=PULSE,0.2sec`, `DO[${fDO("GripClosed")}:GripClosed]=OFF`, `DO[${fDO("GripOpen")}:GripOpen]=ON`]
-        : [`RO[1:Cerrar]=OFF`, `RO[2:Abrir]=ON`, `DO[${fDO("GripClosed")}:GripClosed]=OFF`, `DO[${fDO("GripOpen")}:GripOpen]=ON`]),
+        ? [`RO[1:Vacio]=OFF`, "RO[3:VacioB]=OFF", `RO[2:Soplado]=PULSE,0.2sec`, `DO[${fDO("GripClosed")}:GripClosed]=OFF`, `DO[${fDO("GripOpen")}:GripOpen]=ON`]
+        : [`RO[1:Cerrar]=OFF`, "RO[3:VacioB]=OFF", `RO[2:Abrir]=ON`, `DO[${fDO("GripClosed")}:GripClosed]=OFF`, `DO[${fDO("GripOpen")}:GripOpen]=ON`]),
+      "PAL_SHEET.LS": lsHeader("PAL_SHEET", "Lamina separadora") + lsBody([
+        "!PR[3]=toma lamina en magazin (UF0)",
+        "IF R[4]<1,JMP LBL[93]",
+        `IF R[4]>${lay.pallets.length},JMP LBL[93]`,
+        `GO[${fGO("Step")}:Step]=30`,
+        "CALL PAL_HOLDCHK",
+        "UFRAME_NUM=0",
+        "PR[12]=PR[10]-PR[10]",
+        "PR[12,3]=R[11]",
+        "J PR[3:SheetPick] 100% CNT50 Offset,PR[12]",
+        "L PR[3:SheetPick] 300mm/sec FINE",
+        "RO[4:VacLamina]=ON",
+        "WAIT .30(sec)",
+        "IF RI[4:LaminaOK]=OFF,JMP LBL[94]",
+        "L PR[3:SheetPick] 1500mm/sec CNT50 Offset,PR[12]",
+        "UFRAME_NUM=R[4]",
+        "PR[11]=PR[10]",
+        "PR[11,1]=R[7]/10",
+        "PR[11,2]=R[8]/10",
+        "PR[11,3]=R[9]/10",
+        `R[22]=R[4]+${fDI("PermitPallet1") - 1}`,
+        `R[23]=R[4]+${fDO("OutPallet1") - 1}`,
+        "WAIT DI[R[22]]=ON TIMEOUT,LBL[96]",
+        "DO[R[23]]=OFF",
+        "J PR[11] 100% CNT50 Offset,PR[12]",
+        "L PR[11] 300mm/sec FINE",
+        "RO[4:VacLamina]=OFF",
+        "WAIT .20(sec)",
+        "L PR[11] 1500mm/sec CNT50 Offset,PR[12]",
+        "UFRAME_NUM=0",
+        "J PR[2:SafeTop] 100% CNT100",
+        "DO[R[23]]=ON",
+        `GO[${fGO("Step")}:Step]=0`,
+        "END",
+        "LBL[93]",
+        "R[20]=3",
+        "END",
+        "LBL[94]",
+        "RO[4:VacLamina]=OFF",
+        "L PR[3:SheetPick] 500mm/sec FINE Offset,PR[12]",
+        "R[20]=4",
+        "END",
+        "LBL[96]",
+        "R[20]=6"
+      ]),
       "PAL_GRIPTEST.LS": lsHeader("PAL_GRIPTEST", "Test pinza") + lsBody(["CALL PAL_GRIPON", "WAIT 1.00(sec)", "CALL PAL_GRIPOFF"])
     };
   }
@@ -626,10 +715,12 @@ UTOOL[1]   PINZA      X=    0.000  Y=    0.000  Z=${f1(cfg.toolTcpZ).padStart(8)
 !  PR[2]  SafeTop: punto de paso sobre la base a altura segura (UF0)
 !  PR[10] Referencia de orientación: herramienta hacia abajo, eje X de la herramienta paralelo
 !         al largo de la caja. Sólo se usan sus componentes W, P, R (X,Y,Z se sobreescriben).
-! RI[1] = vacío OK / pinza cerrada ; RI[2] = producto presente en herramienta
-! RO[1] = vacío ON / cerrar pinza   ; RO[2] = soplado / abrir pinza
+! RI[1] = vacío OK / pinza cerrada ; RI[2] = producto presente ; RI[3] = vacío OK zona B ; RI[4] = lámina OK
+! RO[1] = vacío ON / cerrar pinza   ; RO[2] = soplado / abrir   ; RO[3] = vacío zona B    ; RO[4] = ventosas lámina
+! Cajas por toma: ${ctx.pat.nPick} (zona A = mitad +X de la herramienta). R[17] = zonas pedidas por el PLC (1 = A, 3 = A+B).
+!  PR[3]  Toma de lámina separadora sobre el magazín (UF0), con la pila llena
 ! $WAITTMOUT: tiempo máximo de WAIT con TIMEOUT (verificar la unidad en tu versión de software)
-! PAYLOAD[1] = pinza vacía (${ctx.checks.gripMass} kg) ; PAYLOAD[2] = pinza + caja (${f1(ctx.checks.gripMass + cfg.boxWeight)} kg)
+! PAYLOAD[1] = pinza vacía (${ctx.checks.gripMass} kg) ; PAYLOAD[2] = pinza + 1 caja (${f1(ctx.checks.gripMass + cfg.boxWeight)} kg) ; PAYLOAD[3] = pinza + 2 cajas (${f1(ctx.checks.gripMass + 2 * cfg.boxWeight)} kg)
 !
 ! Lógica de fondo (MENU > SETUP > BG Logic) — eco invertido del bit de vida:
 !   DO[${fDO("Rob_LifeBit")}]=(!DI[${fDI("PLC_LifeBit")}]) ;
@@ -658,6 +749,10 @@ UTOOL[1]   PINZA      X=    0.000  Y=    0.000  Z=${f1(cfg.toolTcpZ).padStart(8)
     L.push(`SIGNAL oGripOn $OUT[${cfg.kukaToolOut}]`);
     L.push(`SIGNAL oGripOff $OUT[${cfg.kukaToolOut + 1}]`);
     L.push(`SIGNAL iGripOK $IN[${cfg.kukaToolIn}]`);
+    L.push(`SIGNAL oGripOnB $OUT[${cfg.kukaToolOut + 2}]   ; zona B (toma de 2 cajas)`);
+    L.push(`SIGNAL oSheetVac $OUT[${cfg.kukaToolOut + 3}]  ; ventosas de lámina`);
+    L.push(`SIGNAL iGripOKB $IN[${cfg.kukaToolIn + 2}]`);
+    L.push(`SIGNAL iSheetOK $IN[${cfg.kukaToolIn + 3}]`);
     L.push(`SIGNAL iPartTool $IN[${cfg.kukaToolIn + 1}]`);
     L.push(";ENDFOLD");
     L.push("");
@@ -666,7 +761,7 @@ UTOOL[1]   PINZA      X=    0.000  Y=    0.000  Z=${f1(cfg.toolTcpZ).padStart(8)
     lay.infeeds.forEach((f) => L.push(`; BASE_DATA[${4 + f.id}]  INFEED${f.id} = {X ${f1(f.frame.x)}, Y ${f1(f.frame.y)}, Z ${f1(f.frame.z)}, A ${f3(f.frame.rz)}, B 0.0, C 0.0}`));
     L.push(`; TOOL_DATA[1]  PINZA   = {X 0.0, Y 0.0, Z ${f1(cfg.toolTcpZ)}, A 0.0, B 0.0, C 0.0}`);
     L.push(`; LOAD_DATA[1]  pinza vacía      M=${ctx.checks.gripMass} kg, CDG Z=${f1(cfg.toolTcpZ * 0.45)}`);
-    L.push(`; TOOL_DATA[2] = TOOL_DATA[1] ; LOAD_DATA[2] pinza+caja M=${f1(ctx.checks.gripMass + cfg.boxWeight)} kg`);
+    L.push(`; TOOL_DATA[2] = TOOL_DATA[1] ; LOAD_DATA[2] pinza+1 caja M=${f1(ctx.checks.gripMass + cfg.boxWeight)} kg ; LOAD_DATA[3] pinza+2 cajas M=${f1(ctx.checks.gripMass + 2 * cfg.boxWeight)} kg`);
     L.push("");
     L.push("; ---- sps.sub, sección USER PLC (bit de vida, eco invertido) ----");
     L.push("; oRob_LifeBit = NOT iPLC_LifeBit");
@@ -700,6 +795,9 @@ DECL REAL rBoxW=${f1(ctx.cfg.boxW)}
 DECL REAL rBoxH=${f1(ctx.cfg.boxH)}
 DECL INT nOvr=100
 DECL INT nErr=0
+DECL INT nZones=1
+; Toma de lámina en el magazín (BASE 0): ENSEÑAR con la pila llena
+DECL E6POS xSheetPick={X ${f1(ctx.lay.sheet ? ctx.lay.sheet.center.x : 0)},Y ${f1(ctx.lay.sheet ? ctx.lay.sheet.center.y : 0)},Z ${f1(ctx.cfg.outfeedH - ctx.cfg.pedestalH + 300)},A 0.0,B 0.0,C 180.0,S 2,T 2,E1 0.0,E2 0.0,E3 0.0,E4 0.0,E5 0.0,E6 0.0}
 DECL INT nBoxesDone=0
 DECL REAL rRzOffset=0.0
 ; Home y punto seguro: ENSEÑAR
@@ -740,6 +838,8 @@ ${header(ctx, ";")}
       PickPlace()
     CASE 2, 4
       GoHome()
+    CASE 3
+      SlipSheet()
     CASE 5
       GripOn()
       WAIT SEC 1.0
@@ -793,6 +893,10 @@ DEF ReadCmd()
   rBoxL=giBoxL
   rBoxW=giBoxW
   rBoxH=giBoxH
+  nZones=giGripZones
+  IF nZones<1 THEN
+    nZones=1
+  ENDIF
   nOvr=giSpeedOvr
   IF (nOvr<1) OR (nOvr>100) THEN
     nOvr=100
@@ -818,7 +922,7 @@ DEF PickPlace()
   $BASE=BASE_DATA[4+nPick]
   $TOOL=TOOL_DATA[1]
   $LOAD=LOAD_DATA[1]
-  xT=MakeTarget(-rBoxL/2.0, rBoxW/2.0, rBoxH, 0.0)
+  xT=MakeTarget(-rBoxL*${ctx.pat.nPick}.0/2.0, rBoxW/2.0, rBoxH, 0.0)
   xA=xT
   xA.Z=xT.Z+rAppZ
   CheckHold()
@@ -830,7 +934,7 @@ DEF PickPlace()
   LIN xT
   GripOn()
   WAIT SEC 0.25
-  IF NOT (iGripOK AND iPartTool) THEN
+  IF NOT (iGripOK AND iPartTool AND ((nZones<3) OR iGripOKB)) THEN
     GripOff()
     LIN xA
     $OUT[${dOutInf - 1}+nPick]=TRUE
@@ -838,7 +942,11 @@ DEF PickPlace()
     RETURN
   ENDIF
   $TOOL=TOOL_DATA[2]
-  $LOAD=LOAD_DATA[2]
+  IF nZones>=3 THEN
+    $LOAD=LOAD_DATA[3]
+  ELSE
+    $LOAD=LOAD_DATA[2]
+  ENDIF
   oGripClosed=TRUE
   oPartPresent=TRUE
   LIN xA C_DIS
@@ -933,11 +1041,57 @@ END
 DEF GripOn()
   oGripOff=FALSE
   oGripOn=TRUE
+  IF nZones>=3 THEN
+    oGripOnB=TRUE
+  ENDIF
   oGripOpen=FALSE
+END
+
+DEF SlipSheet()
+  DECL E6POS xT, xA
+  IF (nPlace<1) OR (nPlace>${lay.pallets.length}) THEN
+    nErr=3
+    RETURN
+  ENDIF
+  goStep=30
+  CheckHold()
+  $BASE=$NULLFRAME
+  xA=xSheetPick
+  xA.Z=xSheetPick.Z+rAppZ
+  PTP xA C_PTP
+  LIN xSheetPick
+  oSheetVac=TRUE
+  WAIT SEC 0.3
+  IF NOT iSheetOK THEN
+    oSheetVac=FALSE
+    LIN xA
+    nErr=4
+    RETURN
+  ENDIF
+  LIN xA C_DIS
+  $BASE=BASE_DATA[nPlace]
+  xT=MakeTarget(rX, rY, rZ, rRz)
+  xA=xT
+  xA.Z=xT.Z+rAppZ
+  IF NOT EnterZone(${dPermPal - 1}+nPlace, ${dOutPal - 1}+nPlace) THEN
+    nErr=6
+    RETURN
+  ENDIF
+  PTP xA C_PTP
+  xT.Z=xT.Z+10.0
+  LIN xT
+  oSheetVac=FALSE
+  WAIT SEC 0.2
+  LIN xA C_DIS
+  $BASE=$NULLFRAME
+  PTP xSafeTop C_PTP
+  $OUT[${dOutPal - 1}+nPlace]=TRUE
+  goStep=0
 END
 
 DEF GripOff()
   oGripOn=FALSE
+  oGripOnB=FALSE
   PULSE(oGripOff, TRUE, 0.2)
   oGripClosed=FALSE
   oGripOpen=TRUE

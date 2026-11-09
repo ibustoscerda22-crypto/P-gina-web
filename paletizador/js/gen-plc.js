@@ -18,6 +18,8 @@ PAL.genPLC = (function () {
       ["PB_Stop", "Pulsador Stop"]
     ];
     lay.infeeds.forEach((f) => di.push([`InfeedAtPick${f.id}`, `Infeed ${f.id}: producto en tope de toma (fotocélula)`]));
+    if (ctx.pat.nPick === 2) lay.infeeds.forEach((f) => di.push([`InfeedSecond${f.id}`, `Infeed ${f.id}: segunda caja en posición (toma doble)`]));
+    if (cfg.slipSheet) di.push(["SheetAvail", "Magazín de láminas con material"]);
     lay.pallets.forEach((p) => di.push([`PalletPresent${p.id}`, `Estación ${p.id}: palet presente y centrado`]));
     lay.pallets.forEach((p) => di.push([`ZoneSafe${p.id}`, `Estación ${p.id}: zona libre de personas (cortina/escáner OK o muting)`]));
     if (cfg.palletExit === "conveyor") lay.pallets.forEach((p) => di.push([`OutfeedFree${p.id}`, `Salida ${p.id}: transportador aguas abajo libre`]));
@@ -58,6 +60,7 @@ VERSION : 0.1
       X : Int;    // 0.1 mm en frame del palet
       Y : Int;    // 0.1 mm
       Rz : Int;   // 0.1 grados
+      Zones : Int;   // 1 = zona A (1 caja), 3 = zonas A+B (2 cajas)
    END_STRUCT;
 
 END_TYPE
@@ -549,6 +552,8 @@ VERSION : 0.1
       PB_Start : Bool;
       PB_Stop : Bool;
       InfeedAtPick : Array[1..4] of Bool;
+      InfeedSecond : Array[1..4] of Bool;   // 2ª caja (sólo toma doble)
+      SheetAvail : Bool;                    // magazín de láminas con material
       PalletPresent : Array[1..4] of Bool;
       ZoneSafe : Array[1..4] of Bool;
       OutfeedFree : Array[1..4] of Bool;
@@ -589,6 +594,10 @@ VERSION : 0.1
       complete : Array[1..4] of Bool;
       palletReady : Array[1..4] of Bool;
       infeedReady : Array[1..4] of Bool;
+      infeedPair : Array[1..4] of Bool;
+      sheetDone : Array[1..4] of Bool;
+      zones : Int;
+      need : Int;
       wasPresent : Array[1..4] of Bool;
       i : Int;
       k : Int;
@@ -603,6 +612,9 @@ VERSION : 0.1
    VAR CONSTANT
       N_INFEED : Int := ${ctx.lay.infeeds.length};
       N_PALLET : Int := ${ctx.lay.pallets.length};
+      N_PICK : Int := ${ctx.pat.nPick};                        // cajas por toma de la herramienta
+      SHEET_X : Int := ${Math.round(ctx.cfg.palletL * 5)};     // centro del palet [0.1 mm]
+      SHEET_Y : Int := ${Math.round(ctx.cfg.palletW * 5)};
    END_VAR
 BEGIN
 	REGION Estaciones de palet
@@ -612,6 +624,7 @@ BEGIN
 	            #complete[#i] := FALSE;
 	            #layer[#i] := 1;
 	            #box[#i] := 1;
+	            #sheetDone[#i] := FALSE;
 	        END_IF;
 	        #wasPresent[#i] := #PalletPresent[#i];
 	        IF #HMI.Cmd.ForcePalletDone[#i] THEN
@@ -628,8 +641,9 @@ BEGIN
 	REGION Infeeds
 	    FOR #i := 1 TO #N_INFEED DO
 	        #infeedReady[#i] := #InfeedAtPick[#i];
-	        // Avanza mientras no haya producto en el tope y el robot esté fuera de la zona
-	        #InfeedRun[#i] := NOT #InfeedAtPick[#i] AND #ROB.OutInfeed[#i]
+	        #infeedPair[#i] := #InfeedAtPick[#i] AND (#InfeedSecond[#i] OR #N_PICK < 2);
+	        // Avanza hasta tener las cajas de una toma completa contra el tope y con el robot fuera de la zona
+	        #InfeedRun[#i] := NOT #infeedPair[#i] AND #ROB.OutInfeed[#i]
 	            AND (#PML.State = 6 OR #PML.State = 3 OR #PML.State = 13 OR #PML.State = 5 OR #PML.State = 14);
 	    END_FOR;
 	END_REGION
@@ -720,28 +734,52 @@ BEGIN
 	                        IF #placeSel = 0 AND #palletReady[#i] THEN #placeSel := #i; END_IF;
 	                    END_FOR;
 	                END_IF;
-	                // 2) Infeed: round-robin entre los que tienen producto
-	                #pickSel := 0;
-	                FOR #i := 1 TO #N_INFEED DO
-	                    #k := ((#lastInfeed + #i - 1) MOD #N_INFEED) + 1;
-	                    IF #pickSel = 0 AND #infeedReady[#k] THEN #pickSel := #k; END_IF;
-	                END_FOR;
-	                IF #placeSel > 0 AND #pickSel > 0 THEN
-	                    #activeP := #placeSel;
-	                    #lastInfeed := #pickSel;
+	                IF #placeSel > 0 THEN
 	                    #k := #box[#placeSel];
-	                    IF (#layer[#placeSel] MOD 2) = 1 THEN
-	                        #posX := "DB_Pattern".LayerA[#k].X;
-	                        #posY := "DB_Pattern".LayerA[#k].Y;
-	                        #posRz := "DB_Pattern".LayerA[#k].Rz;
+	                    IF #HMI.Recipe.SlipSheet AND #k = 1 AND NOT #sheetDone[#placeSel] THEN
+	                        // 2a) Lámina separadora al comenzar cada capa (sobre el palet o la capa anterior)
+	                        IF #SheetAvail THEN
+	                            #activeP := #placeSel;
+	                            #pickSel := 0;
+	                            #posX := #SHEET_X;
+	                            #posY := #SHEET_Y;
+	                            #posRz := 0;
+	                            #zones := 0;
+	                            #posZ := (#layer[#placeSel] - 1) * #HMI.Recipe.BoxH * 10;
+	                            #cmdCode := 3;
+	                            #seq := 10;
+	                        END_IF;
 	                    ELSE
-	                        #posX := "DB_Pattern".LayerB[#k].X;
-	                        #posY := "DB_Pattern".LayerB[#k].Y;
-	                        #posRz := "DB_Pattern".LayerB[#k].Rz;
+	                        // 2b) Toma del mosaico: TCP, giro y zonas de la pinza
+	                        IF (#layer[#placeSel] MOD 2) = 1 THEN
+	                            #posX := "DB_Pattern".LayerA[#k].X;
+	                            #posY := "DB_Pattern".LayerA[#k].Y;
+	                            #posRz := "DB_Pattern".LayerA[#k].Rz;
+	                            #zones := "DB_Pattern".LayerA[#k].Zones;
+	                        ELSE
+	                            #posX := "DB_Pattern".LayerB[#k].X;
+	                            #posY := "DB_Pattern".LayerB[#k].Y;
+	                            #posRz := "DB_Pattern".LayerB[#k].Rz;
+	                            #zones := "DB_Pattern".LayerB[#k].Zones;
+	                        END_IF;
+	                        #need := 1;
+	                        IF #zones >= 3 THEN #need := 2; END_IF;
+	                        // 3) Infeed: round-robin entre los que tienen las cajas necesarias
+	                        #pickSel := 0;
+	                        FOR #i := 1 TO #N_INFEED DO
+	                            #k := ((#lastInfeed + #i - 1) MOD #N_INFEED) + 1;
+	                            IF #pickSel = 0 AND ((#need = 1 AND #infeedReady[#k]) OR (#need = 2 AND #infeedPair[#k])) THEN
+	                                #pickSel := #k;
+	                            END_IF;
+	                        END_FOR;
+	                        IF #pickSel > 0 THEN
+	                            #activeP := #placeSel;
+	                            #lastInfeed := #pickSel;
+	                            #posZ := #layer[#placeSel] * #HMI.Recipe.BoxH * 10;
+	                            #cmdCode := 1;
+	                            #seq := 10;
+	                        END_IF;
 	                    END_IF;
-	                    #posZ := #layer[#placeSel] * #HMI.Recipe.BoxH * 10;
-	                    #cmdCode := 1;
-	                    #seq := 10;
 	                END_IF;
 	            END_IF;
 	        10: // Enviar
@@ -755,11 +793,15 @@ BEGIN
 	            END_IF;
 	        20: // Esperar fin
 	            IF #ROB.Done THEN
+	                IF #cmdCode = 3 THEN
+	                    #sheetDone[#placeSel] := TRUE;
+	                END_IF;
 	                IF #cmdCode = 1 THEN
-	                    #HMI.PackTags.Admin.ProdProcessedCount := #HMI.PackTags.Admin.ProdProcessedCount + 1;
+	                    #HMI.PackTags.Admin.ProdProcessedCount := #HMI.PackTags.Admin.ProdProcessedCount + #need;
 	                    #box[#placeSel] := #box[#placeSel] + 1;
 	                    IF #box[#placeSel] > #HMI.Recipe.PerLayer THEN
 	                        #box[#placeSel] := 1;
+	                        #sheetDone[#placeSel] := FALSE;
 	                        #layer[#placeSel] := #layer[#placeSel] + 1;
 	                        IF #layer[#placeSel] > #HMI.Recipe.Layers THEN
 	                            #layer[#placeSel] := 1;
@@ -822,7 +864,8 @@ BEGIN
 	         BoxW := #HMI.Recipe.BoxW,
 	         BoxH := #HMI.Recipe.BoxH,
 	         BoxWeight := #HMI.Recipe.BoxWeight,
-	         GripZones := 255,
+	         GripZones := #zones,
+	         SlipSheetReady := #SheetAvail,
 	         SwapBytes := TRUE,
 	         RobOut => #RobOut);
 	END_REGION
@@ -870,6 +913,7 @@ BEGIN
 	    #HMI.Sts.AlarmWord[0].%X8 := NOT #ROB.AutoMode;
 	    #HMI.Sts.AlarmWord[0].%X9 := #PML.State = 5;
 	    #HMI.Sts.AlarmWord[0].%X10 := #ROB.Error AND #ROB.ErrorCode <> 0 AND #ROB.ErrorCode < 100 AND #ROB.ErrorCode <> 4 AND #ROB.ErrorCode <> 5 AND #ROB.ErrorCode <> 6;
+	    #HMI.Sts.AlarmWord[0].%X11 := #HMI.Recipe.SlipSheet AND NOT #SheetAvail;
 	    #HMI.Sts.AlarmWord[1].%X0 := #complete[1] AND #PalletPresent[1];
 	    #HMI.Sts.AlarmWord[1].%X1 := #complete[2] AND #PalletPresent[2];
 	    #HMI.Sts.AlarmWord[1].%X2 := #complete[3] AND #PalletPresent[3];
@@ -881,26 +925,26 @@ END_FUNCTION_BLOCK
 
   function s7DataBlocks(ctx) {
     const { cfg, pat } = ctx;
-    const n = Math.max(1, pat.perLayer);
-    const assign = (arr, nm) => arr.map((b, i) => `   ${nm}[${i + 1}].X := ${Math.round(b.x * 10)};\n   ${nm}[${i + 1}].Y := ${Math.round(b.y * 10)};\n   ${nm}[${i + 1}].Rz := ${Math.round(b.rot * 10)};`).join("\n");
+    const n = Math.max(1, pat.picksPerLayer);
+    const assign = (arr, nm) => arr.map((u, i) => `   ${nm}[${i + 1}].X := ${Math.round(u.tx * 10)};\n   ${nm}[${i + 1}].Y := ${Math.round(u.ty * 10)};\n   ${nm}[${i + 1}].Rz := ${Math.round(u.rz * 10)};\n   ${nm}[${i + 1}].Zones := ${u.zones};`).join("\n");
     return `// ${cfg.projectName} - Bloques de datos. Generado ${stamp()}
 DATA_BLOCK "DB_Pattern"
-TITLE = 'Mosaico: ${pat.perLayer} cajas/capa, ${pat.layers} capas (${cfg.patternType})'
+TITLE = 'Mosaico: ${pat.perLayer} cajas/capa en ${pat.picksPerLayer} tomas, ${pat.layers} capas (${pat.type})'
 { S7_Optimized_Access := 'TRUE' }
 VERSION : 0.1
 NON_RETAIN
    STRUCT
-      PerLayer : Int;
+      PerLayer : Int;   // tomas por capa
       Layers : Int;
       LayerA : Array[1..${n}] of "typeBoxPos";   // capas impares
       LayerB : Array[1..${n}] of "typeBoxPos";   // capas pares
    END_STRUCT;
 
 BEGIN
-   PerLayer := ${pat.perLayer};
+   PerLayer := ${pat.picksPerLayer};
    Layers := ${pat.layers};
-${assign(pat.layerA, "LayerA")}
-${assign(pat.layerB, "LayerB")}
+${assign(pat.unitsA, "LayerA")}
+${assign(pat.unitsB, "LayerB")}
 
 END_DATA_BLOCK
 
@@ -918,7 +962,7 @@ BEGIN
    HMI.Recipe.BoxW := ${Math.round(cfg.boxW)};
    HMI.Recipe.BoxH := ${Math.round(cfg.boxH)};
    HMI.Recipe.BoxWeight := ${Math.round(cfg.boxWeight * 10)};
-   HMI.Recipe.PerLayer := ${pat.perLayer};
+   HMI.Recipe.PerLayer := ${pat.picksPerLayer};   // tomas por capa (${pat.perLayer} cajas)
    HMI.Recipe.Layers := ${pat.layers};
    HMI.Recipe.SpeedOvr := 100;
    HMI.Recipe.ApproachZ := ${Math.round(cfg.approachZ)};
@@ -945,6 +989,8 @@ END_DATA_BLOCK
     const { lay, cfg } = ctx;
     const L = [];
     lay.infeeds.forEach((f) => L.push(`	"iCell".InfeedAtPick[${f.id}] := ${di("InfeedAtPick" + f.id)};`));
+    lay.infeeds.forEach((f) => L.push(`	"iCell".InfeedSecond[${f.id}] := ${ctx.pat.nPick === 2 ? di("InfeedSecond" + f.id) : "FALSE"};`));
+    L.push(`	"iCell".SheetAvail := ${cfg.slipSheet ? di("SheetAvail") : "FALSE"};`);
     lay.pallets.forEach((p) => {
       L.push(`	"iCell".PalletPresent[${p.id}] := ${di("PalletPresent" + p.id)};`);
       L.push(`	"iCell".ZoneSafe[${p.id}] := ${di("ZoneSafe" + p.id)};`);
@@ -1007,61 +1053,152 @@ END_ORGANIZATION_BLOCK
     return rows.join("\r\n") + "\r\n";
   }
 
+  /* ---------- Allen-Bradley: definición única de UDTs (texto + L5X) ---------- */
+  const AB_UDTS = (() => {
+    const m = (names, type, dim, desc) => names.split(",").map((n) => ({ n: n.trim(), t: type, d: dim || 0, desc: desc || "" }));
+    const cmds = "Reset,Start,Stop,Hold,Unhold,Suspend,Unsuspend,Abort,Clear";
+    return [
+      { name: "UDT_BoxPos", desc: "Toma del mosaico en el frame del palet", mem: [].concat(
+        m("X,Y", "INT", 0, "TCP en 0.1 mm"), m("Rz", "INT", 0, "0.1 grados"), m("Zones", "INT", 0, "1 = zona A, 3 = zonas A+B")) },
+      { name: "UDT_PackML", desc: "Máquina de estados PackML", mem: [].concat(
+        m("State,Mode,ModeReq,PrevState,TimeInState", "DINT"),
+        m("StateChanged,JustChanged,SC,AbortCond,HoldCond,SuspendCond,InitDone", "BOOL"),
+        m(cmds.split(",").map((c) => "Cmd" + c).join(","), "BOOL", 0, "Comando combinado"),
+        m(cmds.split(",").map((c) => "Mem" + c).join(","), "BOOL", 0, "Memoria de flanco"),
+        m("tSec", "FBD_TIMER")) },
+      { name: "UDT_RobotIF", desc: "Interfaz PLC maestro - robot", mem: [].concat(
+        m("Execute,ExecMem,Busy,Done,Error,CommOK,LifeBit", "BOOL"),
+        m("HS,CmdId,Echo,ErrorCode", "DINT"),
+        m("CmdCode,PickStation,PlaceStation,Layer,BoxIndex,PosX,PosY,PosZ,PosRz,ApproachZ,ApproachXY,Zones", "INT"),
+        m("tLife,tLifeChk,tAck,tCmd", "FBD_TIMER")) },
+      { name: "UDT_Cell", desc: "Datos internos de la celda", mem: [].concat(
+        m("Seq,ActiveP,LastInfeed,PickSel,PlaceSel,CmdCode,I,K,TotalPallets,ManualReq,Need", "DINT"),
+        m("Layer,Box", "DINT", 5, "Índice 1..4 por estación"),
+        m("Complete,PalletReady,InfeedReady,InfeedPair,WasPresent,SheetDone", "BOOL", 32, "Índice 1..4"),
+        m("HoldLatch,WorkAvail,Blink,Exec,SheetAvail", "BOOL"),
+        m("tStarve,tAct,tBlink", "FBD_TIMER")) },
+      { name: "UDT_HMI", desc: "Interfaz HMI y PackTags", mem: [].concat(
+        m(cmds.split(",").map((c) => "Cmd_" + c).join(","), "BOOL", 0, "Pulso desde HMI"),
+        m("Cmd_ModeReq", "DINT"),
+        m("Cmd_AckAlarms,Cmd_RobotHome,Cmd_RobotGripTest,Cmd_RobotMaintPos,Cmd_ResetCounters", "BOOL"),
+        m("Cmd_ForcePalletDone", "BOOL", 32),
+        m("Sts_State,Sts_Mode,Sts_ActivePallet,Sts_RobotStep,Sts_RobotError,Sts_CycleTime", "DINT"),
+        m("Sts_Layer,Sts_BoxInLayer", "DINT", 5),
+        m("Sts_PalletComplete,Sts_PalletReady,Sts_InfeedReady", "BOOL", 32),
+        m("Sts_RobotCommOK,Sts_RobotBusy,Sts_RobotAtHome", "BOOL"),
+        m("Sts_AlarmWord", "DINT", 2, "Bits de alarma"),
+        m("Rcp_ProductID,Rcp_BoxL,Rcp_BoxW,Rcp_BoxH,Rcp_BoxWeight,Rcp_PerLayer,Rcp_Layers,Rcp_SpeedOvr,Rcp_ApproachZ,Rcp_ApproachXY,Rcp_TargetPallets", "DINT", 0, "Receta"),
+        m("Rcp_SlipSheet", "BOOL"),
+        m("PT_UnitModeCurrent,PT_StateCurrent,PT_CntrlCmd,PT_ProdProcessedCount,PT_ProdDefectiveCount,PT_PalletCount,PT_StateCurrentTime", "DINT", 0, "PackTags")) }
+    ];
+  })();
+
+  const xmlEsc = (t) => String(t).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+  const cdata = (t) => `<![CDATA[${String(t).replace(/]]>/g, "]] >")}]]>`;
+
+  function abUdtText() {
+    return AB_UDTS.map((u) => `${u.name}   — ${u.desc}\n` + u.mem.map((x) =>
+      `  ${(x.n + (x.d ? `[${x.d}]` : "")).padEnd(26)} ${x.t.padEnd(10)} ${x.desc}`).join("\n")).join("\n\n");
+  }
+
+  function l5xDataType(u) {
+    const out = [];
+    let host = null, bit = 8, hostN = 0;
+    u.mem.forEach((x) => {
+      const desc = x.desc ? `\n<Description>\n${cdata(x.desc)}\n</Description>\n` : "";
+      if (x.t === "BOOL" && !x.d) {
+        if (bit >= 8) {
+          host = `ZZZZZZZZZZ${u.name}${hostN++}`; bit = 0;
+          out.push(`<Member Name="${host}" DataType="SINT" Dimension="0" Radix="Decimal" Hidden="true" ExternalAccess="Read/Write"/>`);
+        }
+        out.push(`<Member Name="${x.n}" DataType="BIT" Dimension="0" Radix="Decimal" Hidden="false" Target="${host}" BitNumber="${bit++}" ExternalAccess="Read/Write">${desc}</Member>`);
+        return;
+      }
+      bit = 8; // un BOOL suelto posterior abre un nuevo SINT anfitrión
+      const radix = x.t === "BOOL" ? "Decimal" : x.t === "FBD_TIMER" ? "NullType" : "Decimal";
+      out.push(`<Member Name="${x.n}" DataType="${x.t}" Dimension="${x.d}" Radix="${radix}" Hidden="false" ExternalAccess="Read/Write">${desc}</Member>`);
+    });
+    return `<DataType Name="${u.name}" Family="NoFamily" Class="User">
+<Description>
+${cdata(u.desc)}
+</Description>
+<Members>
+${out.join("\n")}
+</Members>
+</DataType>`;
+  }
+
+  function abL5X(ctx, routines) {
+    const { cfg } = ctx;
+    const d = new Date();
+    const date = d.toString().replace(/ GMT.*$/, "").replace(/^(\w{3}) (\w{3}) (\d{2}) (\d{4}) /, "$1 $2 $3 $4 ").slice(0, 24);
+    const alias = [];
+    const att = 'Radix="Decimal" ExternalAccess="Read/Write"';
+    I().PLC_TO_ROBOT.forEach((s) => alias.push([`RobO_${s.name}`, I().plcAddr("Allen-Bradley", true, s, cfg), s.desc]));
+    I().ROBOT_TO_PLC.forEach((s) => alias.push([`RobI_${s.name}`, I().plcAddr("Allen-Bradley", false, s, cfg), s.desc]));
+    const io = ioList(ctx);
+    io.di.concat(io.dq).forEach((x) => alias.push([`IO_${x.name}`, x.ab, x.desc]));
+    const ctrlTags = [`<Tag Name="HMI" TagType="Base" DataType="UDT_HMI" Constant="false" ExternalAccess="Read/Write">
+<Description>
+${cdata("Interfaz HMI y PackTags (controller scope para el HMI)")}
+</Description>
+</Tag>`].concat(alias.map(([n, a, ds]) => `<Tag Name="${n}" TagType="Alias" ${att} AliasFor="${xmlEsc(a)}">
+<Description>
+${cdata(ds)}
+</Description>
+</Tag>`));
+    const progTags = [
+      ["PML", "UDT_PackML", 0, "Máquina de estados PackML"], ["ROB", "UDT_RobotIF", 0, "Interfaz robot"],
+      ["CELL", "UDT_Cell", 0, "Datos de la celda"], ["PatA", "UDT_BoxPos", 61, "Mosaico capas impares (1..n)"], ["PatB", "UDT_BoxPos", 61, "Mosaico capas pares (1..n)"]
+    ].map(([n, t, dim, ds]) => `<Tag Name="${n}" TagType="Base" DataType="${t}"${dim ? ` Dimensions="${dim}"` : ""} Constant="false" ExternalAccess="Read/Write">
+<Description>
+${cdata(ds)}
+</Description>
+</Tag>`);
+    const rts = Object.entries(routines).map(([file, code]) => {
+      const name = file.replace(/\.st$/, "");
+      const lines = code.replace(/\r/g, "").split("\n");
+      return `<Routine Name="${name}" Type="ST">
+<STContent>
+${lines.map((l, i) => `<Line Number="${i}">\n${cdata(l)}\n</Line>`).join("\n")}
+</STContent>
+</Routine>`;
+    });
+    return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<RSLogix5000Content SchemaRevision="1.0" SoftwareRevision="33.00" TargetName="Palletizer" TargetType="Program" TargetClass="Standard" ContainsContext="true" ExportDate="${date}" ExportOptions="References NoRawData L5KData DecoratedData Context Dependencies ForceProtectedEncoding AllProjDocTrans">
+<Controller Use="Context" Name="${xmlEsc((cfg.projectName || "PalletCell").replace(/[^A-Za-z0-9_]/g, "_").replace(/^([^A-Za-z])/, "C_$1").slice(0, 40))}">
+<DataTypes Use="Context">
+${AB_UDTS.map(l5xDataType).join("\n")}
+</DataTypes>
+<Tags Use="Context">
+${ctrlTags.join("\n")}
+</Tags>
+<Programs Use="Context">
+<Program Use="Target" Name="Palletizer" TestEdits="false" MainRoutineName="R00_Main" Disabled="false" UseAsFolder="false">
+<Description>
+${cdata(`Celda paletizadora PackML - ${cfg.projectName} - PalletCell Designer`)}
+</Description>
+<Tags>
+${progTags.join("\n")}
+</Tags>
+<Routines>
+${rts.join("\n")}
+</Routines>
+</Program>
+</Programs>
+</Controller>
+</RSLogix5000Content>
+`;
+  }
+
   function abUDTs(ctx) {
     return `UDTs a crear en Studio 5000 (Data Types > User-Defined > New Data Type)
 Generado ${stamp()} — ${ctx.cfg.projectName}
 
-UDT_BoxPos
-  X        INT   0.1 mm en frame del palet
-  Y        INT   0.1 mm
-  Rz       INT   0.1 grados
+${abUdtText()}
 
-UDT_PackML
-  State          DINT   Estado PackML actual (0..17)
-  Mode           DINT   1 Production 2 Maintenance 3 Manual
-  ModeReq        DINT
-  PrevState      DINT
-  StateChanged   BOOL
-  JustChanged    BOOL
-  SC             BOOL   State Complete (de la lógica de máquina)
-  AbortCond      BOOL
-  HoldCond       BOOL
-  SuspendCond    BOOL
-  CmdReset .. CmdClear   BOOL (9)     comandos ya combinados
-  MemReset .. MemClear   BOOL (9)     memorias de flanco
-  TimeInState    DINT   s
-  tSec           TIMER
-  InitDone       BOOL
-
-UDT_RobotIF
-  Execute, ExecMem, Busy, Done, Error, CommOK, LifeBit   BOOL
-  HS, CmdId, Echo, ErrorCode                             DINT
-  CmdCode, PickStation, PlaceStation, Layer, BoxIndex     INT
-  PosX, PosY, PosZ, PosRz, ApproachZ, ApproachXY          INT
-  tLife, tLifeChk, tAck, tCmd                             TIMER
-
-UDT_Cell
-  Seq, ActiveP, LastInfeed, PickSel, PlaceSel, CmdCode, I, K, TotalPallets, ManualReq   DINT
-  Layer[5], Box[5]                     DINT  (índices 1..4)
-  Complete[5], PalletReady[5], InfeedReady[5], WasPresent[5]   BOOL
-  HoldLatch, WorkAvail, Blink, Exec    BOOL
-  tStarve, tAct, tBlink                TIMER
-
-UDT_HMI
-  Cmd_Reset, Cmd_Start, Cmd_Stop, Cmd_Hold, Cmd_Unhold, Cmd_Suspend, Cmd_Unsuspend, Cmd_Abort, Cmd_Clear  BOOL
-  Cmd_ModeReq          DINT
-  Cmd_AckAlarms, Cmd_RobotHome, Cmd_RobotGripTest, Cmd_RobotMaintPos, Cmd_ResetCounters  BOOL
-  Cmd_ForcePalletDone[5]  BOOL
-  Sts_State, Sts_Mode, Sts_ActivePallet, Sts_RobotStep, Sts_RobotError, Sts_CycleTime   DINT
-  Sts_Layer[5], Sts_BoxInLayer[5]           DINT
-  Sts_PalletComplete[5], Sts_PalletReady[5], Sts_InfeedReady[5]   BOOL
-  Sts_RobotCommOK, Sts_RobotBusy, Sts_RobotAtHome  BOOL
-  Sts_AlarmWord[2]       DINT  (bits de alarma)
-  Rcp_ProductID, Rcp_BoxL, Rcp_BoxW, Rcp_BoxH, Rcp_BoxWeight, Rcp_PerLayer, Rcp_Layers   DINT
-  Rcp_SpeedOvr, Rcp_ApproachZ, Rcp_ApproachXY, Rcp_TargetPallets   DINT
-  Rcp_SlipSheet          BOOL
-  PT_UnitModeCurrent, PT_StateCurrent, PT_CntrlCmd     DINT   (PackTags)
-  PT_ProdProcessedCount, PT_ProdDefectiveCount, PT_PalletCount, PT_StateCurrentTime  DINT
+NOTA: TONR en ST usa miembros FBD_TIMER (.PRE, .TimerEnable, .DN). Los BOOL[] van en múltiplos de 32.
+Alternativa más rápida: importar Palletizer_Program.L5X (crea UDTs, tags, alias y rutinas de una vez).
 
 Módulo del robot (I/O Configuration > Ethernet > New Module):
   ${ctx.cfg.robotBrand === "FANUC" ? "FANUC: usar el EDS de R-30iB/R-50iA o 'Generic Ethernet Module' Data-INT, Input 101 (32 INT), Output 151 (32 INT), Config 100 (0), RPI 8-20 ms." : "Usar el archivo EDS del controlador " + ctx.cfg.robotBrand + " o 'Generic Ethernet Module' Data-INT con 32 INT de entrada y 32 INT de salida (instancias de ensamblado según manual del adapter)."}
@@ -1096,23 +1233,23 @@ JSR(R20_RobotIF,0);
 JSR(R60_HMI,0);
 `;
 
-    const assign = (arr, nm) => arr.map((b, i) => `${nm}[${i + 1}].X := ${Math.round(b.x * 10)}; ${nm}[${i + 1}].Y := ${Math.round(b.y * 10)}; ${nm}[${i + 1}].Rz := ${Math.round(b.rot * 10)};`).join("\n");
+    const assign = (arr, nm) => arr.map((u, i) => `${nm}[${i + 1}].X := ${Math.round(u.tx * 10)}; ${nm}[${i + 1}].Y := ${Math.round(u.ty * 10)}; ${nm}[${i + 1}].Rz := ${Math.round(u.rz * 10)}; ${nm}[${i + 1}].Zones := ${u.zones};`).join("\n");
     out["R05_LoadPattern.st"] = pre(`Mosaico ${pat.perLayer} cajas/capa x ${pat.layers} capas`) + `
 HMI.Rcp_ProductID := 1;
 HMI.Rcp_BoxL := ${Math.round(cfg.boxL)};
 HMI.Rcp_BoxW := ${Math.round(cfg.boxW)};
 HMI.Rcp_BoxH := ${Math.round(cfg.boxH)};
 HMI.Rcp_BoxWeight := ${Math.round(cfg.boxWeight * 10)};
-HMI.Rcp_PerLayer := ${pat.perLayer};
+HMI.Rcp_PerLayer := ${pat.picksPerLayer}; // tomas por capa (${pat.perLayer} cajas)
 HMI.Rcp_Layers := ${pat.layers};
 HMI.Rcp_SpeedOvr := 100;
 HMI.Rcp_ApproachZ := ${Math.round(cfg.approachZ)};
 HMI.Rcp_ApproachXY := ${Math.round(cfg.approachXY)};
 HMI.Rcp_SlipSheet := ${cfg.slipSheet ? 1 : 0};
-// Capa A (impares)
-${assign(pat.layerA, "PatA")}
+// Capa A (impares): TCP, giro y zonas por toma
+${assign(pat.unitsA, "PatA")}
 // Capa B (pares)
-${assign(pat.layerB, "PatB")}
+${assign(pat.unitsB, "PatB")}
 `;
 
     out["R10_PackML.st"] = pre("Máquina de estados PackML ISA-TR88.00.02") + `
@@ -1218,7 +1355,7 @@ CASE ROB.HS OF
         RobO_BoxW := HMI.Rcp_BoxW;
         RobO_BoxH := HMI.Rcp_BoxH;
         RobO_BoxWeight := HMI.Rcp_BoxWeight;
-        RobO_GripZones := 255;
+        RobO_GripZones := ROB.Zones;
         RobO_CmdValid := 1;
         ROB.Busy := 1; ROB.Done := 0; ROB.Error := 0; ROB.ErrorCode := 0;
         ROB.HS := 10;
@@ -1261,6 +1398,7 @@ RobO_Hold := PML.State = 10 OR PML.State = 11;
 RobO_GoHome := PML.State = 7;
 RobO_MaintMode := PML.Mode = 2;
 RobO_ManualMode := PML.Mode = 3;
+RobO_SlipSheetReady := CELL.SheetAvail;
 ${lay.pallets.map((p) => `RobO_PermitPallet${p.id} := CELL.PalletReady[${p.id}];\nRobO_PalletReady${p.id} := CELL.PalletReady[${p.id}];`).join("\n")}
 ${lay.infeeds.map((f) => `RobO_PermitInfeed${f.id} := CELL.InfeedReady[${f.id}];\nRobO_InfeedReady${f.id} := CELL.InfeedReady[${f.id}];`).join("\n")}
 `;
@@ -1343,23 +1481,41 @@ CASE CELL.Seq OF
                 IF CELL.PlaceSel = 0 AND CELL.PalletReady[CELL.I] THEN CELL.PlaceSel := CELL.I; END_IF;
             END_FOR;
         END_IF;
-        CELL.PickSel := 0;
-        FOR CELL.I := 1 TO ${nI} DO
-            CELL.K := ((CELL.LastInfeed + CELL.I - 1) MOD ${nI}) + 1;
-            IF CELL.PickSel = 0 AND CELL.InfeedReady[CELL.K] THEN CELL.PickSel := CELL.K; END_IF;
-        END_FOR;
-        IF CELL.PlaceSel > 0 AND CELL.PickSel > 0 THEN
-            CELL.ActiveP := CELL.PlaceSel;
-            CELL.LastInfeed := CELL.PickSel;
+        IF CELL.PlaceSel > 0 THEN
             CELL.K := CELL.Box[CELL.PlaceSel];
-            IF (CELL.Layer[CELL.PlaceSel] MOD 2) = 1 THEN
-                ROB.PosX := PatA[CELL.K].X; ROB.PosY := PatA[CELL.K].Y; ROB.PosRz := PatA[CELL.K].Rz;
+            IF HMI.Rcp_SlipSheet AND CELL.K = 1 AND NOT CELL.SheetDone[CELL.PlaceSel] THEN
+                // Lámina separadora al comenzar cada capa
+                IF CELL.SheetAvail THEN
+                    CELL.ActiveP := CELL.PlaceSel;
+                    CELL.PickSel := 0;
+                    ROB.PosX := ${Math.round(cfg.palletL * 5)}; ROB.PosY := ${Math.round(cfg.palletW * 5)}; ROB.PosRz := 0; ROB.Zones := 0;
+                    ROB.PosZ := (CELL.Layer[CELL.PlaceSel] - 1) * HMI.Rcp_BoxH * 10;
+                    CELL.CmdCode := 3;
+                    CELL.Seq := 10;
+                END_IF;
             ELSE
-                ROB.PosX := PatB[CELL.K].X; ROB.PosY := PatB[CELL.K].Y; ROB.PosRz := PatB[CELL.K].Rz;
+                IF (CELL.Layer[CELL.PlaceSel] MOD 2) = 1 THEN
+                    ROB.PosX := PatA[CELL.K].X; ROB.PosY := PatA[CELL.K].Y; ROB.PosRz := PatA[CELL.K].Rz; ROB.Zones := PatA[CELL.K].Zones;
+                ELSE
+                    ROB.PosX := PatB[CELL.K].X; ROB.PosY := PatB[CELL.K].Y; ROB.PosRz := PatB[CELL.K].Rz; ROB.Zones := PatB[CELL.K].Zones;
+                END_IF;
+                CELL.Need := 1;
+                IF ROB.Zones >= 3 THEN CELL.Need := 2; END_IF;
+                CELL.PickSel := 0;
+                FOR CELL.I := 1 TO ${nI} DO
+                    CELL.K := ((CELL.LastInfeed + CELL.I - 1) MOD ${nI}) + 1;
+                    IF CELL.PickSel = 0 AND ((CELL.Need = 1 AND CELL.InfeedReady[CELL.K]) OR (CELL.Need = 2 AND CELL.InfeedPair[CELL.K])) THEN
+                        CELL.PickSel := CELL.K;
+                    END_IF;
+                END_FOR;
+                IF CELL.PickSel > 0 THEN
+                    CELL.ActiveP := CELL.PlaceSel;
+                    CELL.LastInfeed := CELL.PickSel;
+                    ROB.PosZ := CELL.Layer[CELL.PlaceSel] * HMI.Rcp_BoxH * 10;
+                    CELL.CmdCode := 1;
+                    CELL.Seq := 10;
+                END_IF;
             END_IF;
-            ROB.PosZ := CELL.Layer[CELL.PlaceSel] * HMI.Rcp_BoxH * 10;
-            CELL.CmdCode := 1;
-            CELL.Seq := 10;
         END_IF;
     END_IF;
 10:
@@ -1380,11 +1536,13 @@ CASE CELL.Seq OF
     END_IF;
 20:
     IF ROB.Done THEN
+        IF CELL.CmdCode = 3 THEN CELL.SheetDone[CELL.PlaceSel] := 1; END_IF;
         IF CELL.CmdCode = 1 THEN
-            HMI.PT_ProdProcessedCount := HMI.PT_ProdProcessedCount + 1;
+            HMI.PT_ProdProcessedCount := HMI.PT_ProdProcessedCount + CELL.Need;
             CELL.Box[CELL.PlaceSel] := CELL.Box[CELL.PlaceSel] + 1;
             IF CELL.Box[CELL.PlaceSel] > HMI.Rcp_PerLayer THEN
                 CELL.Box[CELL.PlaceSel] := 1;
+                CELL.SheetDone[CELL.PlaceSel] := 0;
                 CELL.Layer[CELL.PlaceSel] := CELL.Layer[CELL.PlaceSel] + 1;
                 IF CELL.Layer[CELL.PlaceSel] > HMI.Rcp_Layers THEN
                     CELL.Layer[CELL.PlaceSel] := 1;
@@ -1414,9 +1572,10 @@ END_IF;
 `;
 
     out["R40_Stations.st"] = pre("Estaciones de palet e infeeds") + `
+CELL.SheetAvail := ${cfg.slipSheet ? "IO_SheetAvail" : "0"};
 ${lay.pallets.map((p) => `// ---- Estación de palet ${p.id}
 IF CELL.WasPresent[${p.id}] AND NOT IO_PalletPresent${p.id} THEN
-    CELL.Complete[${p.id}] := 0; CELL.Layer[${p.id}] := 1; CELL.Box[${p.id}] := 1;
+    CELL.Complete[${p.id}] := 0; CELL.Layer[${p.id}] := 1; CELL.Box[${p.id}] := 1; CELL.SheetDone[${p.id}] := 0;
 END_IF;
 CELL.WasPresent[${p.id}] := IO_PalletPresent${p.id};
 IF HMI.Cmd_ForcePalletDone[${p.id}] THEN CELL.Complete[${p.id}] := 1; HMI.Cmd_ForcePalletDone[${p.id}] := 0; END_IF;
@@ -1426,7 +1585,8 @@ IO_OutfeedRun${p.id} := ${cfg.palletExit === "conveyor" ? `CELL.Complete[${p.id}
 `).join("\n")}
 ${lay.infeeds.map((f) => `// ---- Infeed ${f.id}
 CELL.InfeedReady[${f.id}] := IO_InfeedAtPick${f.id};
-IO_InfeedRun${f.id} := NOT IO_InfeedAtPick${f.id} AND RobI_OutInfeed${f.id} AND (PML.State = 6 OR PML.State = 3 OR PML.State = 13 OR PML.State = 5 OR PML.State = 14);
+CELL.InfeedPair[${f.id}] := IO_InfeedAtPick${f.id}${ctx.pat.nPick === 2 ? ` AND IO_InfeedSecond${f.id}` : ""};
+IO_InfeedRun${f.id} := NOT CELL.InfeedPair[${f.id}] AND RobI_OutInfeed${f.id} AND (PML.State = 6 OR PML.State = 3 OR PML.State = 13 OR PML.State = 5 OR PML.State = 14);
 `).join("\n")}`;
 
     out["R60_HMI.st"] = pre("Estados al HMI, PackTags, torre de luz y alarmas") + `
@@ -1471,6 +1631,7 @@ HMI.Sts_AlarmWord[0].7 := ROB.Error AND ROB.ErrorCode = 6;
 HMI.Sts_AlarmWord[0].8 := NOT RobI_AutoMode;
 HMI.Sts_AlarmWord[0].9 := PML.State = 5;
 HMI.Sts_AlarmWord[0].10 := ROB.Error AND ROB.ErrorCode > 0 AND ROB.ErrorCode < 100 AND ROB.ErrorCode <> 4 AND ROB.ErrorCode <> 5 AND ROB.ErrorCode <> 6;
+HMI.Sts_AlarmWord[0].11 := HMI.Rcp_SlipSheet AND NOT CELL.SheetAvail;
 ${lay.pallets.map((p) => `HMI.Sts_AlarmWord[1].${p.id - 1} := CELL.Complete[${p.id}] AND IO_PalletPresent${p.id};`).join("\n")}
 `;
     return out;
@@ -1486,6 +1647,7 @@ ${lay.pallets.map((p) => `HMI.Sts_AlarmWord[1].${p.id - 1} := CELL.Complete[${p.
       };
     const out = { "plc/AllenBradley/Tags_y_Alias.CSV": abAliasCSV(ctx), "plc/AllenBradley/UDTs_y_modulo_robot.txt": abUDTs(ctx) };
     const r = abRoutines(ctx);
+    out["plc/AllenBradley/Palletizer_Program.L5X"] = abL5X(ctx, r);
     Object.keys(r).forEach((k) => (out["plc/AllenBradley/" + k] = r[k]));
     return out;
   }

@@ -52,7 +52,8 @@ PAL.genHMI = (function () {
       ["Robot no confirmó el comando (timeout Ack)", "Error"], ["Robot no terminó el comando (timeout)", "Error"],
       ["Producto no detectado o perdido en la herramienta", "Error"], ["Timeout esperando permiso de zona", "Warning"],
       ["Robot no está en modo automático/remoto", "Warning"], ["Celda suspendida: falta producto o palet", "Warning"],
-      ["Error de aplicación del robot (ver código en pantalla Robot)", "Error"]
+      ["Error de aplicación del robot (ver código en pantalla Robot)", "Error"],
+      ["Magazín de láminas separadoras vacío", "Warning"]
     ];
     const A = w0.map((a, i) => ({ id: i + 1, text: a[0], cls: a[1], word: 0, bit: i }));
     ctx.lay.pallets.forEach((p) => A.push({ id: 100 + p.id, text: `Palet ${p.id} completo: retirar`, cls: "Info", word: 1, bit: p.id - 1 }));

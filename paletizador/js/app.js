@@ -15,7 +15,7 @@
     palletType: "ISO 1200x1000 (Chile/industrial)", palletL: 1200, palletW: 1000, palletH: 150, palletMass: 25,
     maxStackH: 1800, maxLayers: 0, overhang: 0, gap: 5, patternType: "trabado", slipSheet: false,
     nOutfeed: 2, outfeedH: 350, palletSupply: "manual", palletExit: "manual",
-    gripper: "vacio", gripperMass: 35, toolTcpZ: 300, pedestalH: 0, approachZ: 150, approachXY: 25,
+    gripper: "vacio", gripperMass: 35, boxesPerPick: 1, toolTcpZ: 300, pedestalH: 0, approachZ: 150, approachXY: 25,
     doors: 1, robotStopTime: 450, lightCurtain: true, lcResolution: 400, lcResponse: 15, safetyPlcResponse: 25, scanner: false, robotSafe: true,
     ipPLC: "192.168.0.1", ipHMI: "192.168.0.10", ipRobot: "192.168.0.20", pnPLC: "plc-pal", pnRobot: "robot-pal",
     plcInStart: 100, plcOutStart: 100, kukaIOOffset: 1, kukaToolOut: 513, kukaToolIn: 513
@@ -100,7 +100,8 @@
 
   /* ---------------- Generación ---------------- */
   function generate() {
-    const c = Object.assign({}, cfg, { boxesPerPick: 1 });
+    const c = Object.assign({}, cfg);
+    c.boxesPerPick = Number(c.boxesPerPick) === 2 ? 2 : 1;
     c.nInfeed = Number(c.nInfeed); c.nOutfeed = Number(c.nOutfeed); c.lcResolution = Number(c.lcResolution);
     const robot = PAL.ROBOTS[c.robotBrand].models[c.robotModel];
     const robotCat = PAL.ROBOTS[c.robotBrand];
@@ -123,9 +124,9 @@
     FILES["docs/guia_implementacion.txt"] = PAL.genDocs.guide(ctx);
     FILES["docs/lista_materiales.csv"] = PAL.genDocs.bom(ctx);
     FILES["docs/layout.svg"] = layoutSVG(ctx, { standalone: true });
-    FILES["docs/mosaico_capaA.svg"] = patternSVG(ctx, ctx.pat.layerA, "Capa A (impares)", true);
-    FILES["docs/mosaico_capaB.svg"] = patternSVG(ctx, ctx.pat.layerB, "Capa B (pares)", true);
-    FILES["docs/posiciones_mosaico.csv"] = ["Capa;Caja;X mm;Y mm;Z mm;Rz °"].concat(ctx.list.map((p) => `${p.layer};${p.idx};${p.x};${p.y};${p.z};${p.rz}`)).join("\r\n");
+    FILES["docs/mosaico_capaA.svg"] = patternSVG(ctx, ctx.pat.unitsA, "Capa A (impares)", true);
+    FILES["docs/mosaico_capaB.svg"] = patternSVG(ctx, ctx.pat.unitsB, "Capa B (pares)", true);
+    FILES["docs/posiciones_mosaico.csv"] = ["Capa;Toma;Cajas;Zonas;TCP X mm;TCP Y mm;Z mm;Rz °"].concat(ctx.list.map((p) => `${p.layer};${p.idx};${p.n};${p.zones};${p.x};${p.y};${p.z};${p.rz}`)).join("\r\n");
     FILES["config.json"] = JSON.stringify(cfg, null, 2);
     FILES["LEEME.txt"] = `Paquete generado por PalletCell Designer — ${c.projectName}\n\nEmpieza por docs/guia_implementacion.txt.\n\n` + Object.keys(FILES).sort().map((f) => "  " + f).join("\n") + "\n";
 
@@ -180,6 +181,12 @@
       labels.push({ x: p.center.x, y: p.center.y, t: `PALET ${p.id}`, a: 0 });
       frames.push({ o: p.frame, n: `P${p.id}` });
     });
+    let sheetPoly = null;
+    if (lay.sheet) {
+      const th = rad(lay.sheet.theta), u = { x: Math.cos(th), y: Math.sin(th) }, t = { x: Math.sin(th), y: -Math.cos(th) };
+      sheetPoly = P(rectPoly(lay.sheet.center.x, lay.sheet.center.y, t, cfg.palletL / 2, u, cfg.palletW / 2));
+      labels.push({ x: lay.sheet.center.x, y: lay.sheet.center.y, t: "LÁMINAS", a: 0 });
+    }
     pts.push([F.x0, F.y0], [F.x1, F.y1], [-robot.reach, -robot.reach * 0.2], [robot.reach * 0.2, 0]);
     let minX = Math.min(...pts.map((q) => q[0])) - 300, maxX = Math.max(...pts.map((q) => q[0])) + 300;
     let minY = Math.min(...pts.map((q) => q[1])) - 300, maxY = Math.max(...pts.map((q) => q[1])) + 500;
@@ -195,7 +202,7 @@
     // Cerco
     shapes.push(`<rect x="${X(F.x0)}" y="${Y(F.y1)}" width="${F.x1 - F.x0}" height="${F.y1 - F.y0}" fill="none" stroke="${col.fence}" stroke-width="${fs / 4}" stroke-dasharray="${fs * 0.8} ${fs * 0.3}"/>`);
     // Puertas: en los puntos del cerco angularmente más alejados de estaciones y de otras puertas
-    const busy = lay.pallets.map((p) => p.theta).concat(lay.infeeds.map((f) => f.theta));
+    const busy = lay.pallets.map((p) => p.theta).concat(lay.infeeds.map((f) => f.theta), lay.sheet ? [lay.sheet.theta] : []);
     const sides = [
       { a: [F.x0, F.y0], b: [F.x1, F.y0], n: [0, 1] }, { a: [F.x1, F.y0], b: [F.x1, F.y1], n: [-1, 0] },
       { a: [F.x1, F.y1], b: [F.x0, F.y1], n: [0, -1] }, { a: [F.x0, F.y1], b: [F.x0, F.y0], n: [1, 0] }
@@ -223,11 +230,13 @@
     }
     // Alcance
     shapes.push(`<circle cx="${X(0)}" cy="${Y(0)}" r="${robot.reach}" fill="none" stroke="${col.robot}" stroke-width="${fs / 8}" stroke-dasharray="${fs / 2} ${fs / 3}" opacity=".8"/>`);
-    shapes.push(`<text x="${X(robot.reach * 0.71)}" y="${Y(-robot.reach * 0.71) }" font-size="${fs * 0.7}" fill="${col.robot}">alcance ${robot.reach} mm</text>`);
+    const lblA = [45, 135, -45, -135, 0, 90, -90, 180].map((a) => ({ a, d: Math.min(...busy.map((x) => angDist(a, x))) })).sort((p, q) => q.d - p.d)[0].a;
+    shapes.push(`<text x="${X(robot.reach * 1.02 * Math.cos(rad(lblA)))}" y="${Y(robot.reach * 1.02 * Math.sin(rad(lblA)))}" font-size="${fs * 0.7}" fill="${col.robot}" text-anchor="${Math.cos(rad(lblA)) < -0.1 ? "end" : "start"}">alcance ${robot.reach} mm</text>`);
     conv.forEach((c) => {
       shapes.push(poly(c.poly, col.conv, col.fence, fs / 10, 'opacity=".55"'));
       if (c.box) { shapes.push(poly(c.box, col.box, col.ink, fs / 12)); if (c.q1) shapes.push(poly(c.q1, col.box, col.ink, fs / 14, 'opacity=".6"')); if (c.q2) shapes.push(poly(c.q2, col.box, col.ink, fs / 14, 'opacity=".4"')); }
     });
+    if (sheetPoly) shapes.push(poly(sheetPoly, col.bg, col.ink, fs / 10, `stroke-dasharray="${fs / 3} ${fs / 6}"`));
     pallets.forEach((p) => { shapes.push(poly(p.pal, col.pallet, col.ink, fs / 10)); p.boxes.forEach((b) => shapes.push(poly(b, col.box, col.ink, fs / 18, 'opacity=".75"'))); });
     if (cfg.lightCurtain || cfg.scanner) curtains.forEach((c) => {
       shapes.push(`<line x1="${X(c.a[0])}" y1="${Y(c.a[1])}" x2="${X(c.b[0])}" y2="${Y(c.b[1])}" stroke="${col.curtain}" stroke-width="${fs / 2.5}"/>`);
@@ -255,7 +264,7 @@
   }
 
   /* ---------------- SVG: mosaico ---------------- */
-  function patternSVG(ctx, layer, title, standalone) {
+  function patternSVG(ctx, units, title, standalone) {
     const { cfg } = ctx;
     const m = 160 + cfg.overhang;
     const W = cfg.palletL + 2 * m, H = cfg.palletW + 2 * m + 120;
@@ -263,14 +272,19 @@
     const c = standalone ? { pal: "#c9a26b", box: "#7aa7d9", ink: "#1f2933", bg: "#fff", muted: "#66727f" } : { pal: "var(--pallet)", box: "var(--box)", ink: "var(--ink)", bg: "var(--bg)", muted: "var(--muted)" };
     const s = [`<rect width="${W}" height="${H}" fill="${c.bg}"/>`];
     s.push(`<rect x="${X(0)}" y="${Y(cfg.palletW)}" width="${cfg.palletL}" height="${cfg.palletW}" fill="${c.pal}" stroke="${c.ink}" stroke-width="4"/>`);
-    layer.forEach((b, i) => {
-      s.push(`<rect x="${X(b.x - b.dx / 2)}" y="${Y(b.y + b.dy / 2)}" width="${b.dx}" height="${b.dy}" fill="${c.box}" stroke="${c.ink}" stroke-width="3" opacity=".9"/>`);
-      s.push(`<line x1="${X(b.x)}" y1="${Y(b.y)}" x2="${X(b.x + (b.rot ? 0 : b.dx * 0.3))}" y2="${Y(b.y + (b.rot ? b.dy * 0.3 : 0))}" stroke="${c.ink}" stroke-width="3" opacity=".5"/>`);
-      s.push(`<text x="${X(b.x)}" y="${+Y(b.y) + 14}" font-size="40" font-weight="700" text-anchor="middle" fill="${c.ink}">${i + 1}</text>`);
+    units.forEach((u, i) => {
+      u.boxes.forEach((b) => s.push(`<rect x="${X(b.x - b.dx / 2)}" y="${Y(b.y + b.dy / 2)}" width="${b.dx}" height="${b.dy}" fill="${c.box}" stroke="${c.ink}" stroke-width="3" opacity=".9"/>`));
+      if (u.n === 2) s.push(`<rect x="${X(u.x - u.dx / 2 + 12)}" y="${Y(u.y + u.dy / 2 - 12)}" width="${u.dx - 24}" height="${u.dy - 24}" fill="none" stroke="${c.ink}" stroke-width="5" stroke-dasharray="18 10"/>`);
+      // TCP y sentido de la herramienta (eje X = zona A)
+      const a = (u.rz * Math.PI) / 180, len = Math.min(140, ctx.cfg.boxL * 0.35);
+      s.push(`<line x1="${X(u.tx)}" y1="${Y(u.ty)}" x2="${X(u.tx + len * Math.cos(a))}" y2="${Y(u.ty + len * Math.sin(a))}" stroke="#d62828" stroke-width="6" opacity=".8"/>`);
+      s.push(`<circle cx="${X(u.tx)}" cy="${Y(u.ty)}" r="10" fill="#d62828"/>`);
+      const lb = u.boxes[0];
+      s.push(`<text x="${X(lb.x)}" y="${+Y(lb.y) + 14}" font-size="40" font-weight="700" text-anchor="middle" fill="${c.ink}">${i + 1}</text>`);
     });
     s.push(`<line x1="${X(0)}" y1="${Y(0)}" x2="${X(220)}" y2="${Y(0)}" stroke="#d62828" stroke-width="8"/><line x1="${X(0)}" y1="${Y(0)}" x2="${X(0)}" y2="${Y(220)}" stroke="#2a9d34" stroke-width="8"/>`);
     s.push(`<text x="${X(230)}" y="${+Y(0) + 12}" font-size="34" fill="#d62828">X</text><text x="${+X(0) - 30}" y="${Y(230)}" font-size="34" fill="#2a9d34">Y</text>`);
-    s.push(`<text x="${W / 2}" y="${H - 30}" font-size="38" text-anchor="middle" fill="${c.muted}">▼ lado del robot ▼   ·   ${esc(title)}   ·   orden de colocación</text>`);
+    s.push(`<text x="${W / 2}" y="${H - 30}" font-size="38" text-anchor="middle" fill="${c.muted}">▼ lado del robot ▼   ·   ${esc(title)}   ·   n° = orden de toma · ● TCP → zona A</text>`);
     return `${standalone ? '<?xml version="1.0" encoding="UTF-8"?>\n' : ""}<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${W} ${H}" font-family="Arial, sans-serif">${s.join("")}</svg>`;
   }
 
@@ -298,7 +312,7 @@
     $("#t-sum").innerHTML = `
       <h2>${esc(cfg.projectName)}</h2>
       <div class="kpis">
-        ${kpi(pat.perLayer, "cajas por capa")}${kpi(pat.layers, "capas")}${kpi(pat.total, "cajas por palet")}
+        ${kpi(pat.perLayer, "cajas por capa")}${kpi(pat.picksPerLayer, "tomas por capa")}${kpi(pat.layers, "capas")}${kpi(pat.total, "cajas por palet")}
         ${kpi(pat.eff + "%", "ocupación de área", pat.eff > 85 ? "ok" : pat.eff > 70 ? "" : "warn")}
         ${kpi(pat.stackH + " mm", "altura palet lleno")}${kpi(f1(pat.palletWeight) + " kg", "peso palet lleno")}
         ${kpi(checks.loadPct + "%", "carga del robot", checks.loadPct > 100 ? "bad" : checks.loadPct > 85 ? "warn" : "ok")}
@@ -339,14 +353,14 @@
     const { pat, list, cfg } = ctx;
     const rows = list.filter((p) => p.layer <= 2);
     $("#t-pat").innerHTML = `<h2>Mosaico de palet</h2>
-      <div class="kpis">${kpi(pat.perLayer, "cajas/capa")}${kpi(pat.layers, "capas")}${kpi(pat.total, "total")}${kpi(pat.eff + "%", "área ocupada")}${kpi(pat.stackH + " mm", "altura")}</div>
+      <div class="kpis">${kpi(pat.perLayer, "cajas/capa")}${kpi(pat.picksPerLayer, "tomas/capa")}${kpi(pat.layers, "capas")}${kpi(pat.total, "total")}${kpi(pat.eff + "%", "área ocupada")}${kpi(pat.stackH + " mm", "altura")}${kpi(esc(pat.type), "mosaico usado")}</div>
       ${pat.warn ? `<ul class="msgs"><li>${esc(pat.warn)}</li></ul>` : ""}
-      <div class="row2"><div><h4>Capa A — impares</h4><div class="svgbox">${patternSVG(ctx, pat.layerA, "Capa A")}</div></div>
-      <div><h4>Capa B — pares</h4><div class="svgbox">${patternSVG(ctx, pat.layerB, "Capa B")}</div></div></div>
-      <p class="hint">Números = orden de colocación (primero lo más lejano al robot). La aproximación final es diagonal desde −X/−Y (${cfg.approachXY} mm) y ${cfg.approachZ} mm en Z, para no rozar cajas ya puestas. Estas posiciones se cargan en el PLC (DB_Pattern / PatA-PatB) y el PLC las envía al robot.</p>
+      <div class="row2"><div><h4>Capa A — impares</h4><div class="svgbox">${patternSVG(ctx, pat.unitsA, "Capa A")}</div></div>
+      <div><h4>Capa B — pares</h4><div class="svgbox">${patternSVG(ctx, pat.unitsB, "Capa B")}</div></div></div>
+      <p class="hint">Números = orden de colocación (primero lo más lejano al robot). La aproximación final es diagonal desde −X/−Y (${cfg.approachXY} mm) y ${cfg.approachZ} mm en Z, para no rozar cajas ya puestas. Las posiciones son del TCP de la herramienta: ${pat.nPick === 2 ? "con pinza de 2 zonas, un par se toma al centro (zonas A+B) y una caja suelta sólo con la zona A, girando la herramienta para que la zona vacía no quede sobre cajas ya puestas" : "con pinza simple el TCP coincide con el centro de la caja"}. Se cargan en el PLC (DB_Pattern / PatA-PatB) y el PLC las envía al robot.</p>
       <h4>Posiciones (capas 1 y 2; el resto en posiciones_mosaico.csv)</h4>
-      <div class="tblwrap"><table><tr><th>Capa</th><th>Caja</th><th>X mm</th><th>Y mm</th><th>Z mm</th><th>Rz °</th><th>Al PLC (X,Y,Z,Rz ×10)</th></tr>
-      ${rows.map((p) => `<tr><td>${p.layer}</td><td>${p.idx}</td><td>${p.x}</td><td>${p.y}</td><td>${p.z}</td><td>${p.rz}</td><td class="mono">${Math.round(p.x * 10)}, ${Math.round(p.y * 10)}, ${Math.round(p.z * 10)}, ${p.rz * 10}</td></tr>`).join("")}</table></div>`;
+      <div class="tblwrap"><table><tr><th>Capa</th><th>Toma</th><th>Cajas</th><th>Zonas</th><th>TCP X</th><th>TCP Y</th><th>Z</th><th>Rz °</th><th>Al PLC (X,Y,Z,Rz ×10)</th></tr>
+      ${rows.map((p) => `<tr><td>${p.layer}</td><td>${p.idx}</td><td>${p.n}</td><td>${p.zones === 3 ? "A+B" : "A"}</td><td>${p.x}</td><td>${p.y}</td><td>${p.z}</td><td>${p.rz}</td><td class="mono">${Math.round(p.x * 10)}, ${Math.round(p.y * 10)}, ${Math.round(p.z * 10)}, ${Math.round(p.rz * 10)}</td></tr>`).join("")}</table></div>`;
   }
 
   function renderWobj() {
@@ -454,7 +468,7 @@
       let i = sim.pallets.findIndex((p, k) => k === sim.active && !p.done);
       if (i < 0) i = sim.pallets.findIndex((p) => !p.done);
       if (i >= 0) {
-        sim.active = i; const p = sim.pallets[i]; p.n++; sim.boxes++;
+        sim.active = i; const p = sim.pallets[i]; const add = Math.min(ctx.pat.nPick, total - p.n); p.n += add; sim.boxes += add;
         if (p.n >= total) { p.done = true; p.swapAt = now + 6000; }
       }
     }

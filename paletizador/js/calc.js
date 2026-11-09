@@ -87,40 +87,143 @@ PAL.calc = (function () {
     return out;
   }
 
+  /* Molinete (pinwheel): 4 bloques alrededor de un hueco central.
+     A abajo-izq (0°), B abajo-der (90°), C arriba-der (0°), D arriba-izq (90°). */
+  function pinwheel(PL, PW, bl, bw, g) {
+    const a = bl + g, b = bw + g, L = PL + g, W = PW + g;
+    let best = { n: 0, boxes: [] };
+    for (let ax = 0; ax <= Math.floor(L / a); ax++)
+      for (let ay = 0; ay <= Math.floor(W / b); ay++) {
+        const wA = ax * a, hA = ay * b;
+        const bx = Math.floor((L - wA) / b);
+        for (let by = 0; by <= Math.floor(W / a); by++) {
+          const hB = by * a;
+          const cy = Math.floor((W - hB) / b), hC = cy * b;
+          for (let cx = 0; cx <= Math.floor(L / a); cx++) {
+            const wC = cx * a;
+            const dy = Math.floor((W - hA) / a);
+            for (let dxn = 0; dxn <= Math.floor(L / b); dxn++) {
+              const wD = dxn * b;
+              if (wD > L - wC + 0.01) break;
+              if (!(hA <= hB + 0.01 || wA <= L - wC + 0.01)) continue;   // A vs C
+              if (!(wD <= wA + 0.01 || hB <= hA + 0.01)) continue;       // B vs D
+              const n = ax * ay + bx * by + cx * cy + dxn * dy;
+              if (n <= best.n) continue;
+              const boxes = gridBoxes(0, 0, ax, ay, a, b, bl, bw, 0)
+                .concat(gridBoxes(wA, 0, bx, by, b, a, bw, bl, 90))
+                .concat(gridBoxes(L - wC, hB, cx, cy, a, b, bl, bw, 0))
+                .concat(gridBoxes(0, hA, dxn, dy, b, a, bw, bl, 90));
+              best = { n, boxes };
+            }
+          }
+        }
+      }
+    return best.boxes;
+  }
+
+  /* Unidades de toma: 1 caja, o 2 cajas en línea a lo largo de su largo (como llegan por el infeed). */
+  function groupUnits(boxes, n, L, g) {
+    if (n < 2) return boxes.map((b) => ({ ...b, boxes: [b], n: 1 }));
+    const used = new Set(), out = [];
+    const key = (b) => (b.rot === 0 ? [b.y, b.x] : [b.x, b.y]);   // [perpendicular, a lo largo]
+    const sorted = boxes.slice().sort((p, q) => (p.rot - q.rot) || (key(p)[0] - key(q)[0]) || (key(p)[1] - key(q)[1]));
+    sorted.forEach((b, i) => {
+      if (used.has(b)) return;
+      const nx = sorted.slice(i + 1).find((c) => !used.has(c) && c.rot === b.rot &&
+        Math.abs(key(c)[0] - key(b)[0]) < 1 && Math.abs(key(c)[1] - key(b)[1] - (L + g)) < 1);
+      used.add(b);
+      if (nx) {
+        used.add(nx);
+        const l = Math.min(b.x - b.dx / 2, nx.x - nx.dx / 2), r = Math.max(b.x + b.dx / 2, nx.x + nx.dx / 2);
+        const d = Math.min(b.y - b.dy / 2, nx.y - nx.dy / 2), u = Math.max(b.y + b.dy / 2, nx.y + nx.dy / 2);
+        out.push({ x: r1((l + r) / 2), y: r1((d + u) / 2), dx: r - l, dy: u - d, rot: b.rot, boxes: [b, nx], n: 2 });
+      } else out.push({ ...b, boxes: [b], n: 1 });
+    });
+    return out;
+  }
+
+  /* Posición del TCP por unidad. Herramienta de 2 zonas: zona A = mitad +X de la herramienta.
+     Par: TCP al centro, zonas A+B. Caja suelta: zona A sobre la caja, se elige el sentido en que
+     la zona B (vacía) no queda sobre cajas ya colocadas. */
+  function toolTargets(units, toolN, L) {
+    const placed = [];
+    const ovl = (a, b) => Math.min(a.x + a.dx / 2, b.x + b.dx / 2) - Math.max(a.x - a.dx / 2, b.x - b.dx / 2) > 1 &&
+                         Math.min(a.y + a.dy / 2, b.y + b.dy / 2) - Math.max(a.y - a.dy / 2, b.y - b.dy / 2) > 1;
+    let conflicts = 0;
+    const out = units.map((u) => {
+      let t;
+      if (toolN < 2) t = { tx: u.x, ty: u.y, rz: u.rot, zones: 1 };
+      else if (u.n === 2) t = { tx: u.x, ty: u.y, rz: u.rot, zones: 3 };
+      else {
+        const opts = [u.rot, u.rot + 180].map((rz) => {
+          const c = Math.cos(rad(rz)), sn = Math.sin(rad(rz));
+          const ghost = { x: u.x - L * c, y: u.y - L * sn, dx: u.dx, dy: u.dy };
+          return { rz, tx: r1(u.x - (L / 2) * c), ty: r1(u.y - (L / 2) * sn), bad: placed.some((p) => ovl(p, ghost)) };
+        });
+        const o = opts.find((q) => !q.bad) || (conflicts++, opts[0]);
+        t = { tx: o.tx, ty: o.ty, rz: o.rz % 360, zones: 1 };
+      }
+      u.boxes.forEach((b) => placed.push(b));
+      return { ...u, ...t };
+    });
+    return { units: out, conflicts };
+  }
+
   function pattern(cfg) {
     const PL = cfg.palletL, PW = cfg.palletW, ov = cfg.overhang, g = cfg.gap;
     const UL = PL + 2 * ov, UW = PW + 2 * ov;
-    let bl = cfg.boxL, bw = cfg.boxW;
-    let base = cfg.patternType === "columna" ? columnBlock(UL, UW, bl, bw, g) : twoBlock(UL, UW, bl, bw, g);
+    const bl = cfg.boxL, bw = cfg.boxW, nPick = cfg.boxesPerPick >= 2 ? 2 : 1;
+    let type = cfg.patternType, base;
+    const warns = [];
+    if (type === "columna") base = columnBlock(UL, UW, bl, bw, g);
+    else {
+      const two = twoBlock(UL, UW, bl, bw, g);
+      const pin = pinwheel(UL, UW, bl, bw, g);
+      if (type === "pinwheel") base = pin.length >= two.length ? pin : two;
+      else if (type === "trabado" && pin.length > two.length) {
+        base = pin; type = "pinwheel";
+        warns.push(`Se usó molinete (pinwheel): cabe ${pin.length - two.length} caja(s) más por capa que el mosaico de dos bloques.`);
+      } else base = two;
+      if (cfg.patternType === "pinwheel" && pin.length < two.length) type = "trabado";
+    }
     base = centerOn(base, PL, PW, ov);
-    const layerA = sortForPlacing(base, cfg.approachXY);
-    let layerB, warn = null;
-    if (cfg.patternType === "columna") layerB = layerA;
-    else if (cfg.patternType === "espejo") layerB = sortForPlacing(base.map((b) => ({ ...b, y: r1(PW - b.y) })), cfg.approachXY);
-    else layerB = sortForPlacing(base.map((b) => ({ ...b, x: r1(PL - b.x), y: r1(PW - b.y) })), cfg.approachXY);
+    // Capa B: trabado = rotación 180°; espejo y pinwheel = espejo en Y (invierte el giro del molinete)
+    let baseB;
+    if (type === "columna") baseB = base;
+    else if (type === "espejo" || type === "pinwheel") baseB = base.map((b) => ({ ...b, y: r1(PW - b.y) }));
+    else baseB = base.map((b) => ({ ...b, x: r1(PL - b.x), y: r1(PW - b.y) }));
 
-    const same = layerA.every((b) => layerB.some((c) => Math.abs(c.x - b.x) < 1 && Math.abs(c.y - b.y) < 1 && c.rot === b.rot));
-    if (cfg.patternType !== "columna" && same)
-      warn = "El mosaico resultante es simétrico: la capa B queda igual a la A y no hay traba entre capas. Considera ajustar medidas, separación o usar lámina separadora (slip sheet).";
+    const mk = (boxes) => {
+      const units = sortForPlacing(groupUnits(boxes, nPick, bl, g), cfg.approachXY);
+      return toolTargets(units, nPick, bl);
+    };
+    const A = mk(base), B = mk(baseB);
+    if (A.conflicts + B.conflicts)
+      warns.push(`${A.conflicts + B.conflicts} caja(s) sueltas dejan la zona vacía de la pinza sobre cajas ya puestas: revisar el orden en simulación.`);
+    const layerA = A.units.flatMap((u) => u.boxes), layerB = B.units.flatMap((u) => u.boxes);
+    const same = base.every((b) => baseB.some((c) => Math.abs(c.x - b.x) < 1 && Math.abs(c.y - b.y) < 1 && c.rot === b.rot));
+    if (type !== "columna" && same)
+      warns.push("El mosaico resultante es simétrico: la capa B queda igual a la A y no hay traba entre capas. Considera ajustar medidas, separación o usar lámina separadora (slip sheet).");
 
     const usableH = cfg.maxStackH - cfg.palletH;
     const layers = Math.max(0, Math.min(cfg.maxLayers || 99, Math.floor(usableH / cfg.boxH)));
-    const perLayer = layerA.length;
-    let area = 0; layerA.forEach((b) => (area += b.dx * b.dy));
+    const perLayer = base.length;
+    let area = 0; base.forEach((b) => (area += b.dx * b.dy));
     const eff = (area / (PL * PW)) * 100;
     const totalW = perLayer * layers * cfg.boxWeight + cfg.palletMass;
     return {
-      layerA, layerB, perLayer, layers, total: perLayer * layers, eff: r1(eff),
-      stackH: cfg.palletH + layers * cfg.boxH, palletWeight: r1(totalW), warn
+      type, layerA, layerB, unitsA: A.units, unitsB: B.units, picksPerLayer: A.units.length, nPick,
+      perLayer, layers, total: perLayer * layers, eff: r1(eff),
+      stackH: cfg.palletH + layers * cfg.boxH, palletWeight: r1(totalW), warn: warns.join(" ") || null
     };
   }
 
-  /* Lista completa de colocaciones (capa, índice, X, Y, Z, Rz) en el frame del palet. */
+  /* Lista completa de tomas (capa, índice, TCP X/Y/Z/Rz, zonas) en el frame del palet. */
   function placements(cfg, pat) {
     const list = [];
     for (let l = 0; l < pat.layers; l++) {
-      const lay = l % 2 === 0 ? pat.layerA : pat.layerB;
-      lay.forEach((b, i) => list.push({ layer: l + 1, idx: i + 1, x: b.x, y: b.y, z: r1((l + 1) * cfg.boxH), rz: b.rot }));
+      const units = l % 2 === 0 ? pat.unitsA : pat.unitsB;
+      units.forEach((u, i) => list.push({ layer: l + 1, idx: i + 1, x: u.tx, y: u.ty, z: r1((l + 1) * cfg.boxH), rz: u.rz, zones: u.zones, n: u.n }));
     }
     return list;
   }
@@ -160,6 +263,18 @@ PAL.calc = (function () {
       const oy = c.y - (cfg.boxL / 2) * u.y - (cfg.boxW / 2) * t.y;
       return { id: i + 1, theta: th, center: c, frame: { x: r1(ox), y: r1(oy), z: r1(z), rz: r1(norm180(th + 180)) } };
     });
+    // Magazín de láminas separadoras: en el ángulo más libre, al 55% del alcance
+    let sheet = null;
+    if (cfg.slipSheet) {
+      const busy = pallets.map((p) => p.theta).concat(infeeds.map((f) => f.theta));
+      let best = 0, bestD = -1;
+      for (let th = -180; th < 180; th += 5) {
+        const d = Math.min(...busy.map((x) => Math.abs(norm180(th - x))));
+        if (d > bestD) { bestD = d; best = th; }
+      }
+      sheet = { theta: best, center: frameFromPolar(best, robot.reach * 0.55), L: cfg.palletL, W: cfg.palletW };
+      if (bestD < 40) warns.push("Poco espacio angular para el magazín de láminas: revisa su ubicación en CAD.");
+    }
     // Solapes entre estaciones
     const all = pallets.map((p) => ({ c: p.center, r: Math.hypot(a, b), n: "Palet " + p.id }))
       .concat(infeeds.map((f) => ({ c: f.center, r: Math.hypot(cfg.boxL, cfg.boxW) / 2 + 150, n: "Infeed " + f.id })));
@@ -175,6 +290,7 @@ PAL.calc = (function () {
       const th = rad(p.theta), t = { x: Math.sin(th), y: -Math.cos(th) }, u = { x: Math.cos(th), y: Math.sin(th) };
       grow(p.center.x + dx * t.x + dy * u.x, p.center.y + dx * t.y + dy * u.y); }); });
     infeeds.forEach((f) => grow(f.center.x, f.center.y));
+    if (sheet) grow(sheet.center.x + Math.sign(sheet.center.x) * cfg.palletL / 2, sheet.center.y + Math.sign(sheet.center.y) * cfg.palletL / 2);
     const m = 700;
     const fence = { x0: Math.round(minx - m), y0: Math.round(miny - m), x1: Math.round(maxx + m), y1: Math.round(maxy + m) };
     // El infeed atraviesa el cerco: se alarga hasta el borde
@@ -182,7 +298,7 @@ PAL.calc = (function () {
     const heightReach = robot.reach * 0.75;
     if (stackTop > heightReach + 600)
       warns.push(`Altura de pila + aproximación (${Math.round(stackTop)} mm sobre la base) es exigente para el alcance vertical del robot; considera pedestal o un modelo mayor.`);
-    return { pallets, infeeds, fence, warns, area: ((fence.x1 - fence.x0) * (fence.y1 - fence.y0)) / 1e6 };
+    return { pallets, infeeds, sheet, fence, warns, area: ((fence.x1 - fence.x0) * (fence.y1 - fence.y0)) / 1e6 };
   }
 
   function norm180(a) { while (a > 180) a -= 360; while (a <= -180) a += 360; return a; }
@@ -231,12 +347,13 @@ PAL.calc = (function () {
   function checks(cfg, robot, pat) {
     const grip = PAL.GRIPPERS[cfg.gripper];
     const gripMass = cfg.gripperMass || grip.mass;
-    const load = gripMass + cfg.boxWeight * cfg.boxesPerPick;
-    const cyclesH = (cfg.rate * cfg.nInfeed * 60) / cfg.boxesPerPick
-      + (cfg.slipSheet ? (cfg.rate * cfg.nInfeed * 60) / Math.max(1, pat.perLayer) : 0);
+    const boxesH = cfg.rate * cfg.nInfeed * 60;
+    const load = gripMass + cfg.boxWeight * (pat.nPick || 1);
+    const avgPerPick = pat.picksPerLayer ? pat.perLayer / pat.picksPerLayer : 1;
+    const cyclesH = boxesH / avgPerPick + (cfg.slipSheet ? boxesH / Math.max(1, pat.perLayer) : 0);
     const capacity = robot.cph * (robot.axes === 6 ? 0.9 : 1) * (load > robot.payload * 0.7 ? 0.8 : 1);
     return {
-      gripMass, load: r1(load), loadPct: r1((load / robot.payload) * 100),
+      gripMass, load: r1(load), avgPerPick: r1(avgPerPick), loadPct: r1((load / robot.payload) * 100),
       cyclesH: Math.round(cyclesH), capacity: Math.round(capacity), cyclePct: r1((cyclesH / capacity) * 100),
       cycleTime: r1(3600 / Math.max(1, cyclesH)),
       palletTime: pat.total ? r1((pat.total / (cfg.rate * cfg.nInfeed)) ) : 0

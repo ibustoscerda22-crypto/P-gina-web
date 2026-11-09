@@ -188,10 +188,12 @@ ${S ? `   1. Crear el proyecto con ${cfg.plcModel}, agregar el robot por GSDML y
    3. Fuentes externas > Agregar archivo: 01_Types.udt, 02_Blocks.scl, 03_DataBlocks.db, 04_Main.scl
       → clic derecho > "Generar bloques desde la fuente", en ese orden.
    4. Compilar, revisar direcciones de E/S físicas en OB1 y cargar.` :
-   `   1. Crear el proyecto con ${cfg.plcModel}, módulo "Robot" en I/O Configuration y tarjetas de E/S locales.
-   2. Crear las UDT (UDTs_y_modulo_robot.txt) e importar Tags_y_Alias.CSV.
-   3. Crear el programa "Palletizer" con rutinas ST: copiar R00..R60 (R00_Main como Main Routine).
-   4. Verificar (Verify Controller) y descargar.`}
+   `   1. Crear el proyecto con ${cfg.plcModel}, el módulo "Robot" en I/O Configuration y las tarjetas de E/S locales
+      (los alias IO_ apuntan a Local:1 entradas y Local:2 salidas; ajústalos si tu hardware es distinto).
+   2. Opción A (recomendada): clic derecho en la tarea > Add > Import Program… > Palletizer_Program.L5X.
+      Crea las UDT, el tag HMI, los alias RobO_/RobI_/IO_ y las 8 rutinas ST (R00_Main es la principal).
+      Opción B (manual): crear las UDT (UDTs_y_modulo_robot.txt), importar Tags_y_Alias.CSV y pegar las rutinas R00..R60.
+   3. Verificar (Verify Controller), revisar advertencias de alias y descargar.`}
 
 FASE 4 — HMI
    - Seguir hmi/HMI_diseno.txt. Importar tags (hmi_tags.csv) y alarmas (hmi_alarms.csv).
