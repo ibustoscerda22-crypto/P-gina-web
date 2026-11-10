@@ -1,3 +1,7 @@
 __pycache__/
 *.pyc
 salida/
+# Plantillas de empresa (logos, cajetín, datos de clientes): no se suben al repositorio
+plantillas/*.qet
+ejemplos/*_pat*.qet
+ejemplos/*_pat*_materiales.csv

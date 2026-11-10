@@ -80,6 +80,7 @@ class Library:
         paths += SYSTEM_PATHS
         self.paths = [p for p in paths if p.is_dir()]
         self._cache: dict[str, ElementDef] = {}
+        self.embedded: dict[str, ET.Element] = {}
 
     def locate(self, rel: str) -> Path:
         for base in self.paths:
@@ -88,10 +89,18 @@ class Library:
                 return f
         raise FileNotFoundError(f"Elemento no encontrado en la biblioteca: {rel} (rutas: {self.paths})")
 
+    def add_embedded(self, defs: dict[str, ET.Element]) -> None:
+        """Agrega definiciones incrustadas (p.ej. de un .qet plantilla); tienen prioridad."""
+        self.embedded.update(defs)
+        for k in defs:
+            self._cache.pop(k, None)
+
     def get(self, rel: str) -> ElementDef:
         if rel not in self._cache:
-            f = self.locate(rel)
-            root = ET.parse(f).getroot()
+            if rel in self.embedded:
+                root = self.embedded[rel]
+            else:
+                root = ET.parse(self.locate(rel)).getroot()
             terms = [
                 TerminalDef(
                     x=float(t.get("x", 0)),

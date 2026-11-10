@@ -46,6 +46,47 @@ python -m qetgen ejemplos/planta_ejemplo.yaml -o salida/planta.qet
 
 Genera `salida/planta.qet` y `salida/planta_materiales.csv`. Abre el `.qet` con QElectroTech.
 
+## Usar un plano de la empresa como plantilla (estilo PAT)
+
+Si le indicas un proyecto `.qet` de referencia, el generador toma de él:
+
+- el **cajetín** (con sus logos) y el **tamaño de folio** (p.ej. 20×10 cuadros de 61×80 px);
+  el título de cada folio se escribe en el campo `%filename` del cajetín y el número en `%folio`;
+- la **portada** (copiada tal cual, con reemplazo de textos) y otros folios que pidas copiar
+  (p.ej. *DATOS TÉCNICOS DEL EQUIPO*);
+- la **configuración del proyecto** (conductores, referencias cruzadas, reportes);
+- los **símbolos incrustados** en ese proyecto (tienen prioridad sobre la biblioteca estándar).
+
+Además genera el **índice con la tabla nativa** de QElectroTech (se actualiza sola si agregas
+folios) y aplica el **estilo de rotulado** de la empresa:
+
+| | Estilo `simple` | Estilo `pat` |
+|---|---|---|
+| Etiquetas | Q1, QM1, KM1, S1, H1 | TM-01, GM-01, KM-01, PB-01, LP-01, RT-01, VF-01, EV-01 |
+| Fases | L1, L2, L3, N, PE | R, S, T, N, TP |
+| Conductores de fuerza | 1, 2, 3... | R-000, S-001, T-002, N-003, TP000 (la etapa avanza en cada equipo) |
+| Conductores de mando | 1, 2, 3... | A-101, A-102... |
+| Descripciones | texto simple | negrita cursiva en mayúsculas; capacidades enmarcadas (4xC63A) |
+
+```yaml
+plantilla: ../plantillas/PAT-1111-PLN-300-0.qet   # relativa al YAML
+estilo: pat
+reemplazos_portada:            # se aplican a la portada y a los folios copiados
+  SISTEMA DE PALETIZADO DE SALMON: TABLERO DE FUERZA Y CONTROL
+  ABRIL 2025: NOV 2026
+copiar_folios: [DATOS TÉCNICOS DEL EQUIPO]
+prefijos: {S: PB, H: LP}       # opcional: cambia cualquier prefijo de etiqueta
+alimentacion:
+  interruptor_general:
+    descripcion: Interruptor termomagnético principal
+    capacidad: 4xC63A
+    icc: "Icc:18kA"
+```
+
+Ejemplo completo: [`ejemplos/planta_pat.yaml`](ejemplos/planta_pat.yaml). La plantilla va en
+`plantillas/` y **no se sube al repositorio** (`.gitignore`), porque contiene logos y datos de
+clientes.
+
 ## Formato de la especificación
 
 ```yaml

@@ -30,14 +30,19 @@ def wrap(text: str, width: int = 14) -> str:
 
 
 class Namer:
-    """Etiquetas secuenciales por prefijo: KM1, KM2, S1, H1..."""
+    """Etiquetas secuenciales por prefijo: KM1, KM2... o, con formato "{p}-{n:02d}", KM-01, KM-02...
 
-    def __init__(self):
+    `prefijos` traduce el prefijo interno (Q, QM, KM, F, M, S, H, KA, KT, U, Y) al de la empresa."""
+
+    def __init__(self, fmt: str = "{p}{n}", prefijos: dict | None = None):
+        self.fmt = fmt
+        self.prefijos = dict(prefijos or {})
         self.count: dict[str, int] = defaultdict(int)
 
     def __call__(self, prefix: str) -> str:
-        self.count[prefix] += 1
-        return f"{prefix}{self.count[prefix]}"
+        p = self.prefijos.get(prefix, prefix)
+        self.count[p] += 1
+        return self.fmt.format(p=p, n=self.count[p])
 
 
 def place(folio: Folio, symbol: str, x: float, y_top: float, label: str = "", **info) -> Element:
@@ -69,6 +74,7 @@ class Bus:
         self.name = name
         self.color = color
         self.num = name if num is None else num
+        self.hint: tuple = ()
         self.last: Terminal | None = None
         self.last_y: float = 0
 
@@ -80,14 +86,17 @@ class Bus:
         if self.last.element.folio is not folio:
             old = self.last.element.folio
             out = old.add("flecha_salida", old.width - 50, self.last_y, self.name)
-            old.wire(self.last, out.left(), y=self.last_y, color=self.color, num=self.num, show_num=False)
+            old.wire(self.last, out.left(), y=self.last_y, color=self.color, num=self.num,
+                     show_num=False).hint = self.hint
             inc = folio.add("flecha_entrada", 40, y, self.name)
             out.link(inc)
             self.last = inc.right()
         if via is not None:
-            folio.wire(self.last, t, via=[(self.last.pos[0], y), *via], color=self.color, num=self.num, show_num=False)
+            c = folio.wire(self.last, t, via=[(self.last.pos[0], y), *via], color=self.color, num=self.num,
+                           show_num=False)
         else:
-            folio.wire(self.last, t, y=y, color=self.color, num=self.num, show_num=False)
+            c = folio.wire(self.last, t, y=y, color=self.color, num=self.num, show_num=False)
+        c.hint = self.hint
         self.last, self.last_y = t, y
 
 
@@ -95,8 +104,7 @@ class Bus:
 # Esquema de fuerza
 # ----------------------------------------------------------------------------
 class PowerSheet:
-    BUS_Y = {"L1": 220, "L2": 240, "L3": 260, "N": 280}
-    PE_Y = 712
+    BUS_DY = (220, 240, 260, 280)  # cotas de las barras fase1, fase2, fase3, N
     TOP = 310   # bornes superiores de las protecciones de cada salida (GV: 310..390)
     KM_TOP = 440  # bornes superiores de los contactores (440..480)
     F_TOP = 530   # relé térmico (530..572)
@@ -104,15 +112,23 @@ class PowerSheet:
 
     def __init__(self, gen: "Generator"):
         self.gen = gen
-        self.buses = {n: Bus(n) for n in ("L1", "L2", "L3", "N")}
-        self.pe = Bus("PE", "#00a000")
+        self.P = gen.phases  # nombres de fase, p.ej. ("L1","L2","L3","N") o ("R","S","T","N")
+        self.BUS_Y = dict(zip(self.P, self.BUS_DY))
+        self.buses = {n: Bus(n, num=gen.bus_num(n)) for n in self.P}
+        self.pe = Bus(gen.pe_name, "#00a000", num=gen.bus_num(gen.pe_name))
+        self.pe.hint = ("pe",)
         self.folio: Folio | None = None
         self.x = 0
 
+    @property
+    def PE_Y(self) -> float:
+        return (self.folio.height if self.folio else 720) - 8
+
     def new_folio(self) -> Folio:
-        n = sum(1 for f in self.gen.project.folios if f.title.startswith("Fuerza"))
-        self.folio = self.gen.project.folio("Fuerza" + (f" ({n + 1})" if n else ""), ROWS)
-        self.folio.show_numbers = bool(self.gen.spec.get("numerar_fuerza", False))
+        base = self.gen.titles["fuerza"]
+        n = sum(1 for f in self.gen.project.folios if f.title.startswith(base))
+        self.folio = self.gen.project.folio(base + (f" ({n + 1})" if n else ""), ROWS)
+        self.folio.show_numbers = bool(self.gen.spec.get("numerar_fuerza", self.gen.style == "pat"))
         self.x = 80
         return self.folio
 
@@ -124,6 +140,16 @@ class PowerSheet:
         self.x += width
         return self.folio, x0
 
+    def w3(self, f: Folio, aa, bb, stage: str, phases=None, **kw):
+        """Une bornes en paralelo (una fase por par) dejando la pista de fase para la numeración."""
+        phases = phases or self.P
+        for i, (a, b) in enumerate(zip(aa, bb)):
+            extra = {k: (v(i) if callable(v) else v) for k, v in kw.items()}
+            if "y" in extra or "via" in extra:  # tramos cruzados: sin número para no ensuciar
+                extra.setdefault("show_num", False)
+            c = f.wire(a, b, **extra)
+            c.hint = ("fase", phases[i], stage)
+
     # --- cabecera: acometida + interruptor general -------------------------
     def head(self, spec: dict) -> None:
         f = self.new_folio()
@@ -131,51 +157,52 @@ class PowerSheet:
         tension = spec.get("tension", "3x400/230 V 50 Hz")
         f.text(f"Acometida {tension}", 130, 22, 8, True)
         q0 = f.add("interruptor_4p", 140, 170, self.gen.names("Q"))
-        q0.add_text(wrap(spec.get("interruptor_general", "Interruptor general"), 18), 46, 2)
+        ig = spec.get("interruptor_general", "Interruptor general")
+        self.gen.describe(q0, ig, dx=46, dy=2, width=18)
         tops = q0.tops()
-        for i, ph in enumerate(("L1", "L2", "L3", "N")):
+        for i in range(4):
             a = src.right(i)
-            f.wire(a, tops[i], via=[(tops[i].pos[0], a.pos[1])], num=ph)
-        for i, ph in enumerate(("L1", "L2", "L3", "N")):
+            c = f.wire(a, tops[i], via=[(tops[i].pos[0], a.pos[1])], show_num=self.gen.style == "pat")
+            c.hint = ("fase", self.P[i], "acometida")
+        for i, ph in enumerate(self.P):
+            self.buses[ph].hint = ("fase", ph, q0.label)
             self.buses[ph].attach(f, q0.bottoms()[i], self.BUS_Y[ph])
         pe = src.right(4)
         self.pe.last, self.pe.last_y = pe, self.PE_Y
         for ph, y in self.BUS_Y.items():
             f.text(ph, f.width - 50, y - 12, 7)
-        f.text("PE", f.width - 50, self.PE_Y - 12, 7)
+        f.text(self.gen.pe_name, f.width - 50, self.PE_Y - 12, 7)
         self.x = 220
 
     def tap3(self, f: Folio, el: Element) -> None:
-        for i, ph in enumerate(("L1", "L2", "L3")):
+        for i, ph in enumerate(self.P[:3]):
             self.buses[ph].attach(f, el.tops()[i], self.BUS_Y[ph])
 
     def protection(self, f: Folio, x0: float, m: "MotorCtx") -> Element:
         """Guardamotor (por defecto) o disyuntor + relé térmico."""
         if m.proteccion == "guardamotor":
             q = place(f, "guardamotor", x0 - 20, self.TOP, m.q)
-            q.add_text(m.spec.get("ajuste", ""), 30, -45)
+            self.gen.rating(q, m.spec.get("ajuste", ""), 30, -45)
         else:  # disyuntor_termico | disyuntor
             q = place(f, "interruptor_3p", x0 - 20, self.TOP, m.q)
-            q.add_text(m.spec.get("interruptor", ""), 32, -40)
+            self.gen.rating(q, m.spec.get("interruptor", ""), 32, -40)
         self.tap3(f, q)
         return q
 
-    def thermal(self, f: Folio, x0: float, m: "MotorCtx", above: list[Terminal]) -> list[Terminal]:
+    def thermal(self, f: Folio, x0: float, m: "MotorCtx", above: list[Terminal], stage: str) -> list[Terminal]:
         if m.proteccion != "disyuntor_termico":
             return above
         fr = place(f, "rele_termico", x0 - 20, self.F_TOP, m.f)
-        fr.add_text(m.spec.get("ajuste", ""), 50, 18)
-        for a, b in zip(above, fr.tops()):
-            f.wire(a, b)
+        self.gen.rating(fr, m.spec.get("ajuste", ""), 50, 18)
+        self.w3(f, above, fr.tops(), stage)
         m.thermal_el = fr
         return fr.bottoms()
 
-    def motor(self, f: Folio, x0: float, m: "MotorCtx", feed: list[Terminal]) -> Element:
+    def motor(self, f: Folio, x0: float, m: "MotorCtx", feed: list[Terminal], stage: str) -> Element:
         mot = place(f, "motor_3f", x0 - 20, self.M_TOP, m.m)
-        for a, b in zip(feed, mot.tops()):
-            f.wire(a, b)
+        self.w3(f, feed, mot.tops(), stage)
         self.pe.attach(f, mot.right(), self.PE_Y)
-        mot.add_text(self.motor_text(m), 36, -16)
+        mot.add_text(self.motor_text(m), 36, -16, font=self.gen.font_desc)
         return mot
 
     @staticmethod
@@ -187,10 +214,10 @@ class PowerSheet:
         f, x0 = self.reserve(140)
         q = self.protection(f, x0, m)
         km = place(f, "contactor_3p", x0 - 20, self.KM_TOP, m.km[0])
-        for a, b in zip(q.bottoms(), km.tops()):
-            f.wire(a, b)
-        feed = self.thermal(f, x0, m, km.bottoms())
-        self.motor(f, x0, m, feed)
+        self.w3(f, q.bottoms(), km.tops(), q.label)
+        stage = km.label
+        feed = self.thermal(f, x0, m, km.bottoms(), stage)
+        self.motor(f, x0, m, feed, m.f or stage)
         m.power_contacts = [km]
         m.prot_el = q
 
@@ -199,16 +226,14 @@ class PowerSheet:
         q = self.protection(f, x0, m)
         km1 = place(f, "contactor_3p", x0 - 20, self.KM_TOP, m.km[0])
         km2 = place(f, "contactor_3p", x0 + 80, self.KM_TOP, m.km[1])
-        for i, (a, b) in enumerate(zip(q.bottoms(), km1.tops())):
-            f.wire(a, b)
-            f.wire(km1.tops()[i], km2.tops()[i], y=self.KM_TOP - 30 + 8 * i)
-        # KM2 invierte L1 <-> L3
+        self.w3(f, q.bottoms(), km1.tops(), q.label)
+        self.w3(f, km1.tops(), km2.tops(), q.label, y=lambda i: self.KM_TOP - 30 + 8 * i)
+        # KM2 invierte fase 1 <-> fase 3
         swap = [2, 1, 0]
-        for i, b in enumerate(km2.bottoms()):
-            dst = km1.bottoms()[swap[i]]
-            f.wire(b, dst, y=self.KM_TOP + 50 + 8 * i)
-        feed = self.thermal(f, x0, m, km1.bottoms())
-        self.motor(f, x0, m, feed)
+        self.w3(f, km2.bottoms(), [km1.bottoms()[k] for k in swap], km1.label,
+                phases=[self.P[k] for k in swap], y=lambda i: self.KM_TOP + 50 + 8 * i)
+        feed = self.thermal(f, x0, m, km1.bottoms(), km1.label)
+        self.motor(f, x0, m, feed, m.f or km1.label)
         m.power_contacts = [km1, km2]
         m.prot_el = q
 
@@ -217,31 +242,26 @@ class PowerSheet:
         xa, xb, xc = x0 - 100, x0, x0 + 90  # KM1/F/motor | KM3 (triángulo) | KM2 (estrella)
         q = self.protection(f, xa, m)
         km1 = place(f, "contactor_3p", xa - 20, self.KM_TOP, m.km[0])  # línea
-        for a, b in zip(q.bottoms(), km1.tops()):
-            f.wire(a, b)
-        feed = self.thermal(f, xa, m, km1.bottoms())
+        self.w3(f, q.bottoms(), km1.tops(), q.label)
+        feed = self.thermal(f, xa, m, km1.bottoms(), km1.label)
         mot = place(f, "motor_3f_6bornes", xa - 20, self.M_TOP, m.m)
-        for a, b in zip(feed, mot.tops()):
-            f.wire(a, b)
-        mot.add_text(self.motor_text(m), -95, -10)
+        self.w3(f, feed, mot.tops(), m.f or km1.label)
+        mot.add_text(self.motor_text(m), -95, -10, font=self.gen.font_desc)
         pe = mot.pin("PE")
         px, py = pe.pos
         self.pe.attach(f, pe, self.PE_Y, via=[(px + 40, self.PE_Y), (px + 40, py - 10), (px, py - 10)])
-        # KM3 triángulo, alimentado aguas abajo de KM1: L1->W2, L2->U2, L3->V2
+        # KM3 triángulo, alimentado aguas abajo de KM1: fase1->W2, fase2->U2, fase3->V2
         km3 = place(f, "contactor_3p", xb - 20, self.F_TOP, m.km[2])
-        for i, (a, b) in enumerate(zip(km1.bottoms(), km3.tops())):
-            f.wire(a, b, y=self.KM_TOP + 55 + 8 * i)
+        self.w3(f, km1.bottoms(), km3.tops(), km1.label, y=lambda i: self.KM_TOP + 55 + 8 * i)
         u2, v2, w2 = mot.pin("U2"), mot.pin("V2"), mot.pin("W2")
-        for i, (src, dst) in enumerate(zip(km3.bottoms(), (w2, u2, v2))):
-            f.wire(src, dst, y=w2.pos[1] + 12 + 8 * i)
+        self.w3(f, km3.bottoms(), (w2, u2, v2), km3.label, y=lambda i: w2.pos[1] + 12 + 8 * i)
         # KM2 estrella: cortocircuita U2-V2-W2 (tomado de las salidas de KM3)
         km2 = place(f, "contactor_3p", xc - 20, self.M_TOP, m.km[1])
         b3 = km3.bottoms()
-        for i, dst in enumerate(km2.tops()):
-            f.wire(b3[i], dst, y=b3[i].pos[1] + 8 + 6 * i)
+        self.w3(f, b3, km2.tops(), km3.label, y=lambda i: b3[i].pos[1] + 8 + 6 * i)
         b = km2.bottoms()
-        f.wire(b[0], b[1], y=b[0].pos[1] + 10)
-        f.wire(b[1], b[2], y=b[0].pos[1] + 10)
+        f.wire(b[0], b[1], y=b[0].pos[1] + 10).hint = ("fase", "Y", km2.label)
+        f.wire(b[1], b[2], y=b[0].pos[1] + 10).hint = ("fase", "Y", km2.label)
         m.power_contacts = [km1, km2, km3]
         m.prot_el = q
 
@@ -249,18 +269,17 @@ class PowerSheet:
         """Salida con variador o partidor suave (contactor de línea opcional)."""
         f, x0 = self.reserve(150)
         q = self.protection(f, x0, m)
-        above = q.bottoms()
+        above, stage = q.bottoms(), q.label
         if m.km:
             km = place(f, "contactor_3p", x0 - 20, self.KM_TOP - 10, m.km[0])
-            for a, b in zip(above, km.tops()):
-                f.wire(a, b)
-            above = km.bottoms()
+            self.w3(f, above, km.tops(), stage)
+            above, stage = km.bottoms(), km.label
             m.power_contacts = [km]
         d = place(f, symbol, x0 - 20, 500, m.u)
-        d.add_text(wrap(" ".join(v for v in (title, m.spec.get("modelo", "")) if v), 14), 36, 4)
-        for a, b in zip(above, d.tops()):
-            f.wire(a, b)
-        self.motor(f, x0, m, d.bottoms())
+        d.add_text(wrap(" ".join(v for v in (title, m.spec.get("modelo", "")) if v), 14), 36, 4,
+                   font=self.gen.font_desc)
+        self.w3(f, above, d.tops(), stage)
+        self.motor(f, x0, m, d.bottoms(), d.label)
         m.prot_el = q
         m.drive_el = d
 
@@ -270,13 +289,13 @@ class PowerSheet:
     def partidor_suave(self, m: "MotorCtx") -> None:
         self._drive(m, "partidor_suave", "Partidor suave")
 
-    def control_supply(self, spec: dict) -> tuple[Terminal, Terminal]:
+    def control_supply(self, spec: dict) -> tuple[Terminal, Terminal, str]:
         f, x0 = self.reserve(100)
         q = place(f, "interruptor_1p_n", x0 - 10, self.TOP, self.gen.names("Q"))
-        q.add_text("Mando " + spec.get("tension_mando", "230 VAC"), 30, -45)
-        self.buses["L1"].attach(f, q.tops()[0], self.BUS_Y["L1"])
-        self.buses["N"].attach(f, q.tops()[1], self.BUS_Y["N"])
-        return q.bottoms()[0], q.bottoms()[1]
+        self.gen.describe(q, "Mando " + spec.get("tension_mando", "230 VAC"), 30, -45)
+        self.buses[self.P[0]].attach(f, q.tops()[0], self.BUS_Y[self.P[0]])
+        self.buses[self.P[3]].attach(f, q.tops()[1], self.BUS_Y[self.P[3]])
+        return q.bottoms()[0], q.bottoms()[1], q.label
 
 
 # ----------------------------------------------------------------------------
@@ -286,8 +305,14 @@ class Ladder:
     RAIL_TOP = 60
     SUBRAIL = 170  # riel después de la parada de emergencia
     FIRST = 200  # cota del primer borne de cada línea
-    RAIL_BOT = 690
-    LOAD_BOTTOM = 650
+    @property
+    def RAIL_BOT(self) -> float:
+        return (self.folio.height if self.folio else 720) - 30
+
+    @property
+    def LOAD_BOTTOM(self) -> float:
+        return self.RAIL_BOT - 40
+
     COL = 70
     GAP = 20
 
@@ -300,8 +325,9 @@ class Ladder:
         self.x = 0
 
     def new_folio(self) -> Folio:
-        n = sum(1 for f in self.gen.project.folios if f.title.startswith("Mando"))
-        self.folio = self.gen.project.folio("Mando" + (f" ({n + 1})" if n else ""), ROWS)
+        base = self.gen.titles["mando"]
+        n = sum(1 for f in self.gen.project.folios if f.title.startswith(base))
+        self.folio = self.gen.project.folio(base + (f" ({n + 1})" if n else ""), ROWS)
         self.x = 100
         return self.folio
 
@@ -326,9 +352,9 @@ class Ladder:
                 el.link(it.master)
             if it.text:
                 if it.load:
-                    el.add_text(wrap(it.text, 12), 10, -62)
+                    el.add_text(wrap(it.text, 12), 10, -62, font=self.gen.font_desc)
                 else:
-                    el.add_text(wrap(it.text, 12), 14, 14)
+                    el.add_text(wrap(it.text, 12), 14, 14, font=self.gen.font_desc)
             if els:
                 f.wire(els[-1].bottoms()[0], el.tops()[0])
             els.append(el)
@@ -390,21 +416,85 @@ class MotorCtx:
 # ----------------------------------------------------------------------------
 # Generador principal
 # ----------------------------------------------------------------------------
+def Folio_height(pl) -> int:
+    return pl.rows * pl.rowsize
+
+
 ARRANQUES = ("directo", "inversor", "estrella_triangulo", "variador", "partidor_suave")
 PROTECCIONES = ("guardamotor", "disyuntor_termico", "disyuntor")
 
 
+ESTILOS = {
+    # estilo genérico
+    "simple": dict(fmt="{p}{n}", prefijos={}, fases=("L1", "L2", "L3", "N"), pe="PE",
+                   titulos={"fuerza": "Fuerza", "mando": "Mando", "portada": "Portada e índice",
+                            "indice": "Índice"}),
+    # estilo tipo PAT: etiquetas con guion y 2 dígitos, fases R-S-T, conductores R-000 / TP000
+    "pat": dict(fmt="{p}-{n:02d}",
+                prefijos={"Q": "TM", "QM": "GM", "F": "RT", "U": "VF", "Y": "EV", "S": "PB", "H": "LP"},
+                fases=("R", "S", "T", "N"), pe="TP",
+                titulos={"fuerza": "CIRCUITO DE FUERZA", "mando": "CIRCUITO DE MANDO", "portada": "PORTADA",
+                         "indice": "ÍNDICE"}),
+}
+
+FONT_DESC_PAT = "Arial,7,-1,5,75,1,0,0,0,0"
+FONT_RATING_PAT = "Arial,7,-1,5,50,0,0,0,0,0"
+
+
 class Generator:
-    def __init__(self, spec: dict, library=None):
+    def __init__(self, spec: dict, library=None, base_dir=None):
+        from pathlib import Path
+
+        from .plantilla import Plantilla
+
         self.spec = spec
         p = spec.get("proyecto", {})
+        self.plantilla = None
+        if spec.get("plantilla"):
+            path = Path(spec["plantilla"])
+            if not path.is_absolute() and base_dir is not None:
+                path = Path(base_dir) / path
+            self.plantilla = Plantilla(path)
+        self.style = spec.get("estilo", "pat" if self.plantilla else "simple")
+        st = ESTILOS[self.style]
+        self.phases = tuple(spec.get("fases", st["fases"]))
+        self.pe_name = st["pe"]
+        self.titles = {**st["titulos"], **spec.get("titulos", {})}
+        self.font_desc = FONT_DESC_PAT if self.style == "pat" else "Sans Serif,6,-1,5,50,0,0,0,0,0"
         self.project = Project(p.get("titulo", "Proyecto"), p.get("autor", ""), library,
                                plant=p.get("planta", ""), location=p.get("ubicacion", ""),
-                               revision=str(p.get("revision", "A")))
-        self.names = Namer()
+                               revision=str(p.get("revision", "A")), plantilla=self.plantilla)
+        self.names = Namer(st["fmt"], {**st["prefijos"], **spec.get("prefijos", {})})
         self.power = PowerSheet(self)
         self.ladder = Ladder(self)
         self.motors: list[MotorCtx] = []
+
+    # --- estilo -----------------------------------------------------------
+    def bus_num(self, name: str) -> str:
+        """En estilo simple las barras llevan su nombre (L1, N...); en estilo pat se numeran por fase."""
+        return name if self.style == "simple" else ""
+
+    def describe(self, el: Element, text, dx: float = 30, dy: float = -40, width: int = 18) -> None:
+        """Descripción del equipo. `text` puede ser str o dict(descripcion, capacidad, icc)."""
+        if isinstance(text, dict):
+            self.rating(el, text.get("capacidad", ""), dx, dy + 30)
+            self.rating(el, text.get("icc", ""), dx, dy + 44, frame=False)
+            text = text.get("descripcion", "")
+        if not text:
+            return
+        if self.style == "pat":
+            el.add_text(wrap(text.upper(), 26), dx, dy, font=FONT_DESC_PAT)
+        else:
+            el.add_text(wrap(text, width), dx, dy)
+
+    def rating(self, el: Element, text: str, dx: float, dy: float, frame: bool = True) -> None:
+        """Capacidad/ajuste del equipo (en estilo pat va enmarcado, como 4xC63A)."""
+        if not text:
+            return
+        if self.style == "pat":
+            el.add_text(text, dx, dy, font=FONT_RATING_PAT, frame=frame)
+        else:
+            el.add_text(text, dx, dy)
 
     # ------------------------------------------------------------------
     def build(self) -> Project:
@@ -414,10 +504,15 @@ class Generator:
         for c in cargas:
             if c.get("tipo", "motor") == "motor":
                 self._power_motor(c)
-        l_out, n_out = self.power.control_supply(alim)
+        l_out, n_out, qc = self.power.control_supply(alim)
         # rieles de mando: vienen del interruptor de mando del folio de fuerza
-        self.ladder.L.last, self.ladder.L.last_y = l_out, l_out.pos[1] + 20
-        self.ladder.N.last, self.ladder.N.last_y = n_out, n_out.pos[1] + 30
+        L = self.ladder
+        L.L.last, L.L.last_y = l_out, l_out.pos[1] + 20
+        L.N.last, L.N.last_y = n_out, n_out.pos[1] + 30
+        if self.style != "simple":
+            L.L.num = L.N.num = ""
+            L.L.hint = ("fase", self.phases[0], qc)
+            L.N.hint = ("fase", self.phases[3], qc)
         self._emergency()
         for m in self.motors:
             self._control_motor(m)
@@ -425,9 +520,40 @@ class Generator:
             if c.get("tipo", "motor") != "motor":
                 self._control_simple(c)
         if self.spec.get("portada", True):
-            self._cover()
-        self.project.autonumber()
+            if self.plantilla is not None and self.plantilla.folio(self.titles["portada"]) is not None:
+                self._cover_from_template()
+            else:
+                self._cover()
+        self.project.autonumber(style="fase" if self.style != "simple" else "simple",
+                                control_fmt=self.spec.get("formato_mando", "A-{:03d}"),
+                                start=101 if self.style != "simple" else 1)
         return self.project
+
+    def _cover_from_template(self) -> None:
+        """Portada copiada de la plantilla + índice con la tabla nativa de QElectroTech
+        + folios adicionales copiados (p.ej. DATOS TÉCNICOS)."""
+        pr, pl = self.project, self.plantilla
+        pr.raw_folio(pl.folio(self.titles["portada"]), self.titles["portada"],
+                     self.spec.get("reemplazos_portada", {}), index=0)
+        pos = 1
+        for t in self.spec.get("copiar_folios", []):
+            xml = pl.folio(t)
+            if xml is None:
+                raise ValueError(f"La plantilla no tiene un folio titulado '{t}'")
+            pr.raw_folio(xml, None, self.spec.get("reemplazos_portada", {}), index=pos)
+            pos += 1
+        rows = max(5, int((Folio_height(pl) - 100) // 25))
+        n_idx = 1
+        while len(pr.folios) + n_idx > rows * n_idx:
+            n_idx += 1
+        prev = None
+        from .project import IndexTable
+        for k in range(n_idx):
+            f = pr.folio(self.titles["indice"], ROWS)
+            pr.folios.insert(1 + k, pr.folios.pop())
+            t = IndexTable(rows, prev, width=f.width - 40)
+            f.tables.append(t)
+            prev = t
 
     def _cover(self) -> None:
         """Folio 1: carátula con datos del proyecto e índice de folios."""
@@ -484,15 +610,18 @@ class Generator:
         els = self.ladder.column(f, x, items, y0=self.ladder.RAIL_TOP + 40)
         self.ladder.to_rails(f, els, start="L", end=None)
         self.ladder.Lp.last, self.ladder.Lp.last_y = els[-1].bottoms()[0], self.ladder.SUBRAIL
-        f.text("Circuito de mando " + self.spec.get("alimentacion", {}).get("tension_mando", "230 VAC"),
-               20, 10, 8, True)
+        txt = "Circuito de mando " + self.spec.get("alimentacion", {}).get("tension_mando", "230 VAC")
+        if self.style == "pat":
+            f.text(txt.upper(), 60, 22, 8, True, True, "Arial")
+        else:
+            f.text(txt, 20, 10, 8, True)
 
     def _prot_contact(self, m: MotorCtx, normally_open=False) -> Item | None:
         if m.proteccion == "disyuntor":
             return None
         if m.proteccion == "guardamotor":
-            sym = "contacto_guardamotor_na" if normally_open else "contacto_guardamotor_nc"
-            return Item(sym, m.q, m.prot_el)
+            # contacto auxiliar del guardamotor (13-14 / 21-22), enlazado al guardamotor
+            return Item("contacto_na" if normally_open else "contacto_nc", m.q, m.prot_el)
         sym = "contacto_termico_na" if normally_open else "contacto_termico_nc"
         return Item(sym, m.f, m.thermal_el)
 
@@ -639,5 +768,5 @@ class Generator:
         self.ladder.to_rails(f, els)
 
 
-def generate(spec: dict, library=None) -> Project:
-    return Generator(spec, library).build()
+def generate(spec: dict, library=None, base_dir=None) -> Project:
+    return Generator(spec, library, base_dir).build()

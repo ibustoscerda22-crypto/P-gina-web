@@ -28,7 +28,7 @@ def main(argv=None) -> None:
     a = ap.parse_args(argv)
 
     spec = load_spec(a.spec)
-    project = generate(spec, Library(a.lib))
+    project = generate(spec, Library(a.lib), base_dir=a.spec.parent)
     out = a.output or a.spec.with_suffix(".qet")
     project.save(out)
     print(f"Proyecto generado: {out}  ({len(project.folios)} folios)")

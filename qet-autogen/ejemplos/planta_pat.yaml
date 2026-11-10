@@ -1,0 +1,53 @@
+# Mismo tipo de especificación, pero usando un plano de la empresa como PLANTILLA:
+# cajetín (logos MOWI/PAT), tamaño de folio 20x10, portada, índice nativo y símbolos incrustados.
+plantilla: ../plantillas/PAT-1111-PLN-300-0.qet   # ruta relativa a este archivo
+estilo: pat              # etiquetas TM-01, KM-01...; conductores R-000, S-001, TP000; mando A-101...
+
+proyecto:
+  titulo: TABLERO DE FUERZA Y CONTROL
+  autor: IMO
+
+# textos de la portada de la plantilla que se reemplazan
+reemplazos_portada:
+  SISTEMA DE PALETIZADO DE SALMON: TABLERO DE FUERZA Y CONTROL
+  AS-BUILT: EMISIÓN
+  ABRIL 2025: NOV 2026
+
+copiar_folios: [DATOS TÉCNICOS DEL EQUIPO]
+
+alimentacion:
+  tension: 3x380/220 V 50 Hz
+  tension_mando: 220 VAC
+  interruptor_general:
+    descripcion: Interruptor termomagnético principal
+    capacidad: 4xC63A
+    icc: "Icc:18kA"
+
+parada_emergencia: true
+
+cargas:
+  - tipo: motor
+    tag: M-01
+    descripcion: Cinta transportadora
+    potencia: 2,2 kW
+    arranque: directo
+    ajuste: 4-6,3 A
+
+  - tipo: motor
+    tag: M-02
+    descripcion: Portón
+    potencia: 1,5 kW
+    arranque: inversor
+    proteccion: disyuntor_termico
+    interruptor: 3xC10A
+
+  - tipo: motor
+    tag: M-03
+    descripcion: Ventilador
+    potencia: 5,5 kW
+    arranque: variador
+    interruptor: 3xC16A
+    modelo: 5,5 kW 380 V
+
+  - tipo: electrovalvula
+    descripcion: Válvula de llenado

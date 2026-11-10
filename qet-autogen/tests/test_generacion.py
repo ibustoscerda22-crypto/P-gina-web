@@ -68,11 +68,30 @@ def test_trazados_coherentes(tmp_path):
             assert abs((x2 - x1) - w) <= 1 and abs((y2 - y1) - h) <= 1
 
 
+def test_plantilla_de_empresa(tmp_path):
+    """Si hay una plantilla en plantillas/, el proyecto usa su cajetín, tamaño de folio e índice nativo."""
+    base = Path(__file__).parents[1] / "ejemplos"
+    spec = yaml.safe_load((base / "planta_pat.yaml").read_text("utf-8"))
+    if not (base / spec["plantilla"]).exists():
+        print("  (sin plantilla local: prueba omitida)")
+        return
+    out = generate(spec, Library(), base_dir=base).save(tmp_path / "pat.qet")
+    root = ET.parse(out).getroot()
+    assert root.find("titleblocktemplates") is not None
+    diagrams = root.findall("diagram")
+    assert diagrams[0].get("title") == "PORTADA" and diagrams[1].find("tables") is not None
+    for d in diagrams:
+        assert d.get("titleblocktemplate") and d.get("filename") == d.get("title")
+    nums = {c.get("num") for d in diagrams for c in d.iter("conductor")}
+    assert {"R-000", "S-000", "T-000", "N-000", "TP000"} <= nums
+    assert any(n.startswith("A-1") for n in nums)
+
+
 if __name__ == "__main__":
     import tempfile
 
     for fn in (test_conductores_apuntan_a_bornes_existentes, test_bornes_coinciden_con_la_definicion,
-               test_trazados_coherentes):
+               test_trazados_coherentes, test_plantilla_de_empresa):
         with tempfile.TemporaryDirectory() as d:
             fn(Path(d))
         print("OK", fn.__name__)
