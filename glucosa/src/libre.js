@@ -55,7 +55,20 @@ export class LibreLinkUpClient {
     };
   }
 
+  // Si el login falla, espera antes de reintentar para no provocar un bloqueo de la cuenta.
   async login() {
+    if (this.loginError && Date.now() < this.loginRetryAt) throw this.loginError;
+    try {
+      await this.doLogin();
+      this.loginError = null;
+    } catch (err) {
+      this.loginError = err;
+      this.loginRetryAt = Date.now() + (/demasiados intentos/.test(err.message) ? 15 : 5) * 60_000;
+      throw err;
+    }
+  }
+
+  async doLogin() {
     for (let i = 0; i < 3; i++) {
       const res = await fetch(`${this.base}/llu/auth/login`, {
         method: "POST",
@@ -69,7 +82,7 @@ export class LibreLinkUpClient {
         continue; // la cuenta vive en otra región: reintentar ahí
       }
       if (body.status === 2) throw new Error("LibreLinkUp: correo o contraseña incorrectos.");
-      if (body.status === 4) {
+      if (body.status === 4 || body?.data?.step) {
         throw new Error(
           "LibreLinkUp pide aceptar términos o confirmar algo. Abre la app LibreLinkUp, inicia sesión y acepta lo que aparezca."
         );
@@ -79,10 +92,23 @@ export class LibreLinkUpClient {
           `LibreLinkUp rechazó la versión ${this.version}. Sube LIBRE_VERSION en el .env (mínimo pedido: ${body?.data?.minimumVersion ?? "desconocido"}).`
         );
       }
+      if (body.status === 429 || res.status === 429) {
+        const min = Math.ceil((body?.data?.data?.lockout ?? body?.data?.lockout ?? 300) / 60);
+        throw new Error(
+          `LibreLinkUp bloqueó el inicio de sesión por demasiados intentos. Cierra el panel, espera unos ${min} minutos y vuelve a abrirlo.`
+        );
+      }
       const ticket = body?.data?.authTicket;
       const userId = body?.data?.user?.id;
       if (!ticket?.token || !userId) {
-        throw new Error(`LibreLinkUp: respuesta de login inesperada (HTTP ${res.status}).`);
+        // Muestra el motivo que da LibreLinkUp, sin datos sensibles
+        const detalle = [
+          `estado ${body?.status ?? "?"}`,
+          body?.error?.message && `mensaje "${body.error.message}"`,
+          body?.data?.step?.type && `paso pendiente "${body.data.step.type}"`,
+          body?.data && typeof body.data === "object" && `campos: ${Object.keys(body.data).join(", ") || "ninguno"}`,
+        ].filter(Boolean);
+        throw new Error(`LibreLinkUp: respuesta de login inesperada (HTTP ${res.status}; ${detalle.join("; ")}).`);
       }
       this.auth = {
         token: ticket.token,

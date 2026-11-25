@@ -81,3 +81,20 @@ test("cliente: redirección de región, Account-Id y lectura", async () => {
     srv.close();
   }
 });
+
+test("cliente: explica el error y no reintenta el login de inmediato", async () => {
+  let logins = 0;
+  const srv = http.createServer((req, res) => {
+    logins++;
+    res.end(JSON.stringify({ status: 7, error: { message: "Algo raro" }, data: {} }));
+  });
+  await new Promise((r) => srv.listen(0, r));
+  try {
+    const c = new LibreLinkUpClient({ email: "a@b.c", password: "x", baseUrl: `http://127.0.0.1:${srv.address().port}` });
+    await assert.rejects(c.fetchGraph(), /estado 7; mensaje "Algo raro"/);
+    await assert.rejects(c.fetchGraph(), /estado 7/);
+    assert.equal(logins, 1);
+  } finally {
+    srv.close();
+  }
+});
