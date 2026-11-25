@@ -13,6 +13,9 @@ const PORT = Number(process.env.PORT || 3100);
 const POLL_MS = Math.max(60, Number(process.env.POLL_SECONDS || 60)) * 1000;
 const PANEL_PASSWORD = process.env.PANEL_PASSWORD || "";
 
+// "npm run demo" usa datos falsos (funciona igual en Windows, Mac y Linux)
+if (process.argv.includes("--demo")) process.env.LIBRE_MOCK = "1";
+
 const monitor = new Monitor();
 const app = express();
 const clients = new Set();
