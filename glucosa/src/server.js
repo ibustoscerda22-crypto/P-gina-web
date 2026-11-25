@@ -7,6 +7,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import express from "express";
 import { Monitor } from "./monitor.js";
+import { Alerter } from "./alerts.js";
 import { summarize, byDay, lowEpisodes, dayKey, TZ } from "./stats.js";
 
 const PORT = Number(process.env.PORT || 3100);
@@ -17,6 +18,7 @@ const PANEL_PASSWORD = process.env.PANEL_PASSWORD || "";
 if (process.argv.includes("--demo")) process.env.LIBRE_MOCK = "1";
 
 const monitor = new Monitor();
+const alerter = new Alerter();
 const app = express();
 const clients = new Set();
 
@@ -74,6 +76,8 @@ function broadcast(data) {
 }
 
 let lastT = 0;
+const log = (...a) => console.log(`[${new Date().toLocaleTimeString()}]`, ...a);
+
 async function poll() {
   try {
     const now = await monitor.refresh();
@@ -82,14 +86,28 @@ async function poll() {
       broadcast(now);
     }
   } catch (err) {
-    console.error(`[${new Date().toLocaleTimeString()}]`, err.message);
+    log(err.message);
     broadcast({ ...(monitor.now() ?? {}), error: err.message });
+  }
+  // Los avisos se revisan siempre, también si LibreLinkUp falla (avisa "sin datos").
+  try {
+    const sent = await alerter.check(monitor.now());
+    if (sent) log("Aviso enviado:", sent.title);
+  } catch (err) {
+    log("No se pudo enviar el aviso:", err.message);
   }
 }
 
-app.listen(PORT, () => {
+app.listen(PORT, (err) => {
+  // Express 5 entrega aquí el error si el puerto está ocupado
+  if (err?.code === "EADDRINUSE") {
+    log(`El panel ya está corriendo en el puerto ${PORT}. No hace falta abrirlo otra vez.`);
+    process.exit(3); // iniciar-panel.bat usa este código para no reintentar
+  }
+  if (err) throw err;
   const mode = process.env.LIBRE_MOCK === "1" ? " (modo demo, datos falsos)" : "";
-  console.log(`Panel de glucosa en http://localhost:${PORT}${mode}`);
+  log(`Panel de glucosa en http://localhost:${PORT}${mode}`);
+  log(alerter.enabled ? `Avisos activos: bajo ${alerter.low}, alto ${alerter.high} (ntfy)` : "Avisos al celular desactivados (falta NTFY_TEMA en el .env)");
   poll();
   setInterval(poll, POLL_MS);
 });

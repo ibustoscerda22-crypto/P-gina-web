@@ -43,6 +43,26 @@ una Raspberry Pi o un servidor).
 - Para instalarla: en Android (Chrome) usa *⋮ → Instalar app*; en iPhone (Safari), *Compartir → Agregar a inicio*.
   Los avisos del navegador necesitan HTTPS (Tailscale y los servicios anteriores lo entregan).
 
+## Avisos al celular (bajo 50 / sobre 250)
+
+El PC envía los avisos con [ntfy](https://ntfy.sh), una app gratuita. Llegan aunque el celular esté bloqueado
+y el panel cerrado en el celular, **siempre que el PC esté encendido**.
+
+1. Instala **ntfy** en el iPhone (App Store) y permite las notificaciones.
+2. En la app pulsa **+** y suscríbete a un tema inventado, largo y difícil de adivinar
+   (por ejemplo `glucosa-ignacio-8f3k2q9x`). Cualquiera que conozca el nombre puede leer los avisos.
+3. En el `.env` pon ese mismo tema: `NTFY_TEMA=glucosa-ignacio-8f3k2q9x`.
+4. Prueba con `npm run probar-aviso`.
+
+Por defecto avisa bajo 50 (urgente, se repite cada 10 min), sobre 250 (cada 30 min), cuando vuelves a rango
+y si pasan 30 min sin lecturas. Cambia los valores con `ALERTA_BAJO`, `ALERTA_ALTO`, etc.
+
+## Que se abra solo al encender el PC (Windows)
+
+Doble clic en **`activar-inicio-automatico.bat`**. Desde ahí el panel arranca oculto cada vez que inicias
+sesión en Windows, se reinicia solo si se cae y se detiene al apagar el PC. El registro queda en
+`data\panel.log`. Para quitarlo: **`desactivar-inicio-automatico.bat`**.
+
 ## 4. Conectar el MCP a Claude
 
 **Claude Code:**

@@ -98,3 +98,32 @@ test("cliente: explica el error y no reintenta el login de inmediato", async () 
     srv.close();
   }
 });
+
+test("avisos: bajo 50 urgente, repite cada 10 min, alto 250, vuelta a rango", async () => {
+  const { Alerter } = await import("../src/alerts.js");
+  const sent = [];
+  const srv = http.createServer((req, res) => {
+    let b = "";
+    req.on("data", (c) => (b += c));
+    req.on("end", () => { sent.push(JSON.parse(b)); res.end("{}"); });
+  });
+  await new Promise((r) => srv.listen(0, r));
+  try {
+    const a = new Alerter({ NTFY_TEMA: "t", NTFY_SERVIDOR: `http://127.0.0.1:${srv.address().port}` });
+    const r = (mgdl, haceMinutos = 1) => ({ mgdl, haceMinutos, tendencia: { arrow: "↓", label: "bajando" } });
+    const T = 1_000_000_000;
+    assert.equal(await a.check(r(120), T), null);
+    assert.match((await a.check(r(48), T)).title, /BAJA: 48/);
+    assert.equal(await a.check(r(45), T + 5 * 60_000), null); // no repite antes de 10 min
+    assert.ok(await a.check(r(44), T + 11 * 60_000));
+    assert.match((await a.check(r(90), T + 12 * 60_000)).title, /De vuelta en rango/);
+    assert.equal(await a.check(r(250), T + 13 * 60_000), null); // 250 justo no es "sobre 250"
+    assert.match((await a.check(r(260), T + 14 * 60_000)).title, /alta: 260/);
+    assert.match((await a.check(r(260, 40), T + 50 * 60_000)).title, /Sin datos/);
+    assert.equal(sent[0].topic, "t");
+    assert.equal(sent[0].priority, 5);
+    assert.equal(sent.length, 5);
+  } finally {
+    srv.close();
+  }
+});

@@ -9,6 +9,7 @@
     "dev": "node --watch src/server.js",
     "mcp": "node src/mcp.js",
     "revisar": "node src/revisar.js",
+    "probar-aviso": "node src/probar-aviso.js",
     "demo": "node src/server.js --demo",
     "test": "node --test"
   },
