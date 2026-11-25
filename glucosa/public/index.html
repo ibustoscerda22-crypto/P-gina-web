@@ -1,0 +1,67 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>Mi Glucosa</title>
+  <meta name="theme-color" content="#0f1419">
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="icon" href="icon.svg" type="image/svg+xml">
+  <link rel="apple-touch-icon" href="icon.svg">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <main>
+    <section class="hero" id="hero" data-estado="sin-datos">
+      <div class="reading">
+        <span class="value" id="value">--</span>
+        <span class="arrow" id="arrow"></span>
+      </div>
+      <div class="unit">mg/dL</div>
+      <div class="meta"><span id="label">Conectando…</span> · <span id="ago"></span></div>
+      <div class="error" id="error" hidden></div>
+    </section>
+
+    <section class="card">
+      <div class="card-head">
+        <h2>Curva</h2>
+        <div class="tabs" id="range">
+          <button data-h="3">3 h</button>
+          <button data-h="6">6 h</button>
+          <button data-h="12">12 h</button>
+          <button data-h="24" class="on">24 h</button>
+        </div>
+      </div>
+      <div id="chart" class="chart"></div>
+    </section>
+
+    <section class="card">
+      <h2>Hoy</h2>
+      <div class="tir" id="tir"></div>
+      <div class="tir-legend" id="tir-legend"></div>
+      <div class="stats" id="today"></div>
+      <div id="hypos"></div>
+    </section>
+
+    <section class="card">
+      <h2>Últimos 14 días</h2>
+      <div class="stats" id="period"></div>
+      <div class="table-wrap">
+        <table id="days">
+          <thead><tr><th>Día</th><th>Prom.</th><th>En rango</th><th>Bajo</th><th>Alto</th><th>Mín–Máx</th></tr></thead>
+          <tbody></tbody>
+        </table>
+      </div>
+    </section>
+
+    <section class="card settings">
+      <label><input type="checkbox" id="notify"> Avisarme en este dispositivo si estoy bajo o alto</label>
+      <p class="fine">Los avisos solo llegan con la app abierta o en segundo plano reciente. <strong>No reemplazan las alarmas de la app oficial de FreeStyle Libre.</strong></p>
+      <p class="fine">Datos vía LibreLinkUp (API no oficial). No uses este panel para decidir dosis de insulina.</p>
+    </section>
+  </main>
+  <script src="app.js"></script>
+</body>
+</html>
