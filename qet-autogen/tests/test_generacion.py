@@ -87,11 +87,29 @@ def test_plantilla_de_empresa(tmp_path):
     assert any(n.startswith("A-1") for n in nums)
 
 
+def test_compatibilidad_versiones(tmp_path):
+    """El archivo declara 0.70 (sin avisos en QElectroTech 0.7 a 0.200); las tablas solo desde 0.8."""
+    from qetgen.project import Project, VERSIONES_QET
+
+    spec = yaml.safe_load((Path(__file__).parents[1] / "ejemplos" / "planta_ejemplo.yaml").read_text("utf-8"))
+    for v in VERSIONES_QET:
+        root = ET.parse(generate(spec, Library(), qet_version=v).save(tmp_path / f"p{v}.qet")).getroot()
+        assert root.get("version") == "0.70"
+        assert all(d.get("version") == "0.70" for d in root.iter("diagram"))
+    p = Project("x", qet_version="0.7")
+    assert not p.supports("tablas") and Project("x", qet_version="0.100").supports("tablas")
+    # los textos libres se leen como HTML en todas las versiones
+    f = p.folio("F")
+    f.text("A < B & C\nlínea 2", 0, 0)
+    txt = f.to_xml(1).find("inputs")[0].get("text")
+    assert txt == "A &lt; B &amp; C<br/>línea 2"
+
+
 if __name__ == "__main__":
     import tempfile
 
     for fn in (test_conductores_apuntan_a_bornes_existentes, test_bornes_coinciden_con_la_definicion,
-               test_trazados_coherentes, test_plantilla_de_empresa):
+               test_trazados_coherentes, test_plantilla_de_empresa, test_compatibilidad_versiones):
         with tempfile.TemporaryDirectory() as d:
             fn(Path(d))
         print("OK", fn.__name__)

@@ -8,6 +8,7 @@ from pathlib import Path
 from .bom import write_bom
 from .circuits import generate
 from .library import Library
+from .project import VERSIONES_QET
 
 
 def load_spec(path: Path) -> dict:
@@ -25,10 +26,14 @@ def main(argv=None) -> None:
     ap.add_argument("-o", "--output", type=Path, help="Archivo .qet de salida")
     ap.add_argument("--bom", type=Path, help="Archivo CSV con la lista de materiales")
     ap.add_argument("--lib", action="append", default=[], help="Carpeta extra de elementos .elmt")
+    ap.add_argument("--version-qet", choices=VERSIONES_QET, default=None,
+                    help="Versión de QElectroTech donde se abrirá el plano (por defecto la del YAML o 0.8). "
+                         "Los archivos se abren en todas las versiones desde 0.7; con 0.7 el índice se "
+                         "dibuja con textos porque esa versión no tiene tablas.")
     a = ap.parse_args(argv)
 
     spec = load_spec(a.spec)
-    project = generate(spec, Library(a.lib), base_dir=a.spec.parent)
+    project = generate(spec, Library(a.lib), base_dir=a.spec.parent, qet_version=a.version_qet)
     out = a.output or a.spec.with_suffix(".qet")
     project.save(out)
     print(f"Proyecto generado: {out}  ({len(project.folios)} folios)")

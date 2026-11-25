@@ -87,6 +87,32 @@ Ejemplo completo: [`ejemplos/planta_pat.yaml`](ejemplos/planta_pat.yaml). La pla
 `plantillas/` y **no se sube al repositorio** (`.gitignore`), porque contiene logos y datos de
 clientes.
 
+## Compatibilidad con las versiones de QElectroTech
+
+Los archivos generados se abren en **QElectroTech 0.7, 0.8, 0.9, 0.100 y 0.200 (desarrollo)**,
+en Windows, Linux y macOS. Esto se verificó revisando el código de carga de cada versión
+(y abriendo los archivos en la 0.9):
+
+- Los conductores se enlazan por el **id de borne**, el método que todas las versiones aceptan
+  (las nuevas también aceptan uuid, las antiguas no).
+- La posición de cada borne en el archivo (4 px hacia dentro del símbolo) es la que usan todas
+  las versiones para reconocerlo.
+- El archivo declara **versión 0.70**: las versiones ≤ 0.9 avisan "guardado con una versión
+  posterior" si el número es mayor que el suyo, y desde la 0.9 avisan "compatibilidad parcial"
+  si es ≤ 0.6. Con 0.70 no aparece ningún aviso en ninguna versión, y ninguna lo usa para otra cosa.
+- Las fuentes se escriben en el formato de 10 campos de Qt 5, que también lee la 0.200 (Qt 6).
+- Los textos libres del folio se escapan como HTML, porque todas las versiones los leen así.
+
+Lo único que depende de la versión es el **índice**: la tabla automática existe desde la 0.8.
+Para la 0.7 se dibuja con textos:
+
+```bash
+python -m qetgen ejemplos/planta_pat.yaml --version-qet 0.7     # o en el YAML: version_qet: "0.7"
+```
+
+Opciones: `0.7`, `0.8` (por defecto), `0.9`, `0.100`, `0.200`. La 0.6 y anteriores no se
+soportan (QElectroTech dejó de abrir por completo esos proyectos desde la 0.9).
+
 ## Formato de la especificación
 
 ```yaml

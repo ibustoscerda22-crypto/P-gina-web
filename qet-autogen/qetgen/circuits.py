@@ -442,7 +442,7 @@ FONT_RATING_PAT = "Arial,7,-1,5,50,0,0,0,0,0"
 
 
 class Generator:
-    def __init__(self, spec: dict, library=None, base_dir=None):
+    def __init__(self, spec: dict, library=None, base_dir=None, qet_version: str | None = None):
         from pathlib import Path
 
         from .plantilla import Plantilla
@@ -463,7 +463,8 @@ class Generator:
         self.font_desc = FONT_DESC_PAT if self.style == "pat" else "Sans Serif,6,-1,5,50,0,0,0,0,0"
         self.project = Project(p.get("titulo", "Proyecto"), p.get("autor", ""), library,
                                plant=p.get("planta", ""), location=p.get("ubicacion", ""),
-                               revision=str(p.get("revision", "A")), plantilla=self.plantilla)
+                               revision=str(p.get("revision", "A")), plantilla=self.plantilla,
+                               qet_version=str(qet_version or spec.get("version_qet", "0.8")))
         self.names = Namer(st["fmt"], {**st["prefijos"], **spec.get("prefijos", {})})
         self.power = PowerSheet(self)
         self.ladder = Ladder(self)
@@ -548,12 +549,27 @@ class Generator:
             n_idx += 1
         prev = None
         from .project import IndexTable
+        idx_folios = []
         for k in range(n_idx):
             f = pr.folio(self.titles["indice"], ROWS)
             pr.folios.insert(1 + k, pr.folios.pop())
-            t = IndexTable(rows, prev, width=f.width - 40)
-            f.tables.append(t)
-            prev = t
+            idx_folios.append(f)
+            if pr.supports("tablas"):
+                t = IndexTable(rows, prev, width=f.width - 40)
+                f.tables.append(t)
+                prev = t
+        if not pr.supports("tablas"):  # QElectroTech 0.7: índice con textos
+            for k, f in enumerate(idx_folios):
+                f.text("N°", 60, 60, 9, True)
+                f.text("Folio", 120, 60, 9, True)
+                f.text("Título", 220, 60, 9, True)
+                total = len(pr.folios)
+                for j, fo in enumerate(pr.folios[k * rows:(k + 1) * rows]):
+                    n = k * rows + j + 1
+                    y = 90 + j * 25
+                    f.text(str(n), 60, y, 9)
+                    f.text(f"{n}/{total}", 120, y, 9)
+                    f.text(fo.title, 220, y, 9)
 
     def _cover(self) -> None:
         """Folio 1: carátula con datos del proyecto e índice de folios."""
@@ -768,5 +784,7 @@ class Generator:
         self.ladder.to_rails(f, els)
 
 
-def generate(spec: dict, library=None, base_dir=None) -> Project:
-    return Generator(spec, library, base_dir).build()
+def generate(spec: dict, library=None, base_dir=None, qet_version: str | None = None) -> Project:
+    """`qet_version`: versión de QElectroTech destino (0.7, 0.8, 0.9, 0.100, 0.200).
+    Si no se indica se usa `version_qet` del YAML, o 0.8 por defecto."""
+    return Generator(spec, library, base_dir, qet_version).build()

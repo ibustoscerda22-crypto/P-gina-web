@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import copy
 import datetime as _dt
+import html as _html
 import uuid as _uuid
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -11,7 +12,22 @@ from xml.etree import ElementTree as ET
 from .library import ORIENT, ElementDef, Library
 from .symbols import sym
 
-QET_VERSION = "0.90"
+# Versión que se declara en el archivo. QElectroTech <= 0.9 compara este número como decimal
+# y avisa "documento guardado con una versión posterior" si es mayor que la suya; desde 0.9
+# además avisa "compatibilidad parcial" si es <= 0.6. Declarar 0.70 evita ambos avisos en
+# todas las versiones 0.7, 0.8, 0.9, 0.100 y 0.200, y ninguna lo usa para otra cosa.
+# (Nunca "0.100": como decimal vale 0.1 y las versiones antiguas lo tomarían por <= 0.6.)
+QET_VERSION = "0.70"
+
+# Versiones de QElectroTech soportadas y lo que cambia entre ellas para lo que generamos.
+VERSIONES_QET = ("0.7", "0.8", "0.9", "0.100", "0.200")
+
+
+def version_tuple(v: str) -> tuple[int, ...]:
+    """'0.9' -> (0, 90); '0.100' -> (0, 100); '0.8' -> (0, 80). Ordena bien 0.9 < 0.100."""
+    parts = str(v).strip().split(".")
+    major, minor = int(parts[0]), parts[1] if len(parts) > 1 else "0"
+    return (major, int(minor) * 10 if len(minor) == 1 else int(minor))
 
 CONDUCTOR_DEFAULTS = {
     "type": "multi", "condsize": "1", "cable": "", "bus": "", "function": "",
@@ -289,6 +305,7 @@ class RawFolio:
     def to_xml(self, order: int) -> ET.Element:
         d = copy.deepcopy(self.xml)
         d.set("order", str(order))
+        d.set("version", QET_VERSION)
         d.set("title", self.title)
         if self.project.plantilla is not None:
             d.set("filename", self.title)
@@ -379,8 +396,10 @@ class Folio:
         ins = ET.SubElement(d, "inputs")
         for t in self.texts:
             weight = "75" if t.bold else "50"
+            # todas las versiones leen este texto como HTML (setHtml): se escapa y \n -> <br/>
+            html_text = _html.escape(t.text).replace("\n", "<br/>")
             ET.SubElement(ins, "input", {
-                "x": _num(t.x), "y": _num(t.y), "text": t.text, "rotation": str(t.rotation),
+                "x": _num(t.x), "y": _num(t.y), "text": html_text, "rotation": str(t.rotation),
                 "font": f"{t.family},{t.size},-1,5,{weight},{1 if t.italic else 0},0,0,0,0",
                 "color": "#000000", "frame": "false", "text_width": "-1",
             })
@@ -393,7 +412,8 @@ class Folio:
 
 class Project:
     def __init__(self, title: str, author: str = "", library: Library | None = None,
-                 plant: str = "", location: str = "", revision: str = "A", plantilla=None):
+                 plant: str = "", location: str = "", revision: str = "A", plantilla=None,
+                 qet_version: str = "0.8"):
         self.title = title
         self.author = author
         self.plant = plant
@@ -402,12 +422,21 @@ class Project:
         self.filename = ""
         self.date = _dt.date.today()
         self.library = library or Library()
+        if str(qet_version) not in VERSIONES_QET:
+            raise ValueError(f"Versión de QElectroTech no soportada: {qet_version}. "
+                             f"Opciones: {', '.join(VERSIONES_QET)}")
+        self.qet_version = str(qet_version)
         self.plantilla = plantilla
         if plantilla is not None:
             self.library.add_embedded(plantilla.elements)
         self.folios: list = []
         self._tid = 1
         self._tables = 0
+
+    def supports(self, feature: str) -> bool:
+        """¿La versión destino de QElectroTech soporta esta función?"""
+        minimum = {"tablas": "0.8"}[feature]  # tablas nativas (índice) desde 0.8
+        return version_tuple(self.qet_version) >= version_tuple(minimum)
 
     def table_counter(self) -> int:
         self._tables += 1
