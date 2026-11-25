@@ -8,6 +8,7 @@
     "start": "node src/server.js",
     "dev": "node --watch src/server.js",
     "mcp": "node src/mcp.js",
+    "revisar": "node src/revisar.js",
     "demo": "node src/server.js --demo",
     "test": "node --test"
   },
